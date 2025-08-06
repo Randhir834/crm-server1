@@ -109,8 +109,8 @@ const uploadLeads = async (req, res) => {
       columnIndexes: columnIndexes
     });
 
-    // Validate required columns
-    if (!columnIndexes.name || !columnIndexes.email) {
+    // Validate required columns (allow index 0)
+    if (typeof columnIndexes.name !== 'number' || typeof columnIndexes.email !== 'number') {
       return res.status(400).json({
         success: false,
         message: 'File must contain "Name" and "Email" columns'
