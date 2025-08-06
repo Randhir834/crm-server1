@@ -54,9 +54,10 @@ const leadValidation = [
     .trim()
     .isLength({ max: 100 })
     .withMessage('Company name is too long'),
+  // **MODIFIED**: Synchronized status enum with the Lead schema
   body('status')
     .optional()
-    .isIn(['New', 'Contacted', 'Qualified', 'Proposal Sent', 'Negotiation', 'Closed', 'Lost'])
+    .isIn(['New', 'Qualified', 'Negotiation', 'Closed', 'Lost'])
     .withMessage('Invalid status'),
   body('source')
     .optional()
@@ -98,4 +99,4 @@ router.patch('/:id/deactivate', auth, softDeleteLead);
 // Export leads to Excel
 router.get('/export/excel', auth, exportLeads);
 
-module.exports = router; 
+module.exports = router;
