@@ -15,7 +15,8 @@ const {
   getAllUsers,
   updateUserRole,
   getSystemStats,
-  checkFirstUser
+  checkFirstUser,
+  deleteUser
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -185,7 +186,7 @@ router.post('/logout', auth, async (req, res) => {
   try {
     // End the current session
     const userId = req.user._id;
-    console.log(`🔄 Logging out user: ${userId}`);
+
     
     // Find and end the current active session
     const session = await Session.findOne({ 
@@ -193,7 +194,7 @@ router.post('/logout', auth, async (req, res) => {
       isActive: true 
     });
     
-    console.log(`📊 Found active session:`, session ? {
+    
       sessionId: session._id,
       loginTime: session.loginTime,
       isActive: session.isActive
@@ -204,7 +205,7 @@ router.post('/logout', auth, async (req, res) => {
       session.isActive = false;
       session.duration = session.logoutTime.getTime() - session.loginTime.getTime();
       await session.save();
-      console.log(`✅ Session ended:`, {
+      
         sessionId: session._id,
         logoutTime: session.logoutTime,
         duration: session.duration
@@ -232,7 +233,10 @@ router.put('/users/:id/role', auth, admin, [
   body('role').isIn(['user', 'admin']).withMessage('Role must be either "user" or "admin"')
 ], updateUserRole);
 
+// Delete user (admin only)
+router.delete('/users/:id', auth, admin, deleteUser);
+
 // Get system statistics (admin only)
 router.get('/stats', auth, admin, getSystemStats);
 
-module.exports = router; 
+module.exports = router;

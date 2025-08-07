@@ -47,7 +47,7 @@ const register = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
-    console.log(`✅ New user registered: ${email}`);
+
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -116,16 +116,12 @@ const login = async (req, res) => {
     });
     await session.save();
 
-    console.log(`✅ Session created for user ${user.email}:`, {
-      sessionId: session._id,
-      loginTime: session.loginTime,
-      isActive: session.isActive
-    });
+
 
     // Generate token
     const token = generateToken(user._id);
 
-    console.log(`✅ User logged in: ${email}`);
+
 
     res.json({
       message: 'Login successful',
@@ -283,6 +279,62 @@ const checkFirstUser = async (req, res) => {
   }
 };
 
+// @desc    Delete user (admin only)
+// @route   DELETE /api/auth/users/:id
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Prevent admin from deleting themselves
+    if (user._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+    
+    // Delete all sessions associated with this user
+    const deletedSessions = await Session.deleteMany({ userId: userId });
+    
+    // Delete all leads created by this user
+    const Lead = require('../models/Lead');
+    const deletedLeads = await Lead.deleteMany({ createdBy: userId });
+    
+    // Update leads assigned to this user (set assignedTo to null)
+    const updatedLeads = await Lead.updateMany(
+      { assignedTo: userId },
+      { $set: { assignedTo: null } }
+    );
+    
+    // Delete all call schedules created by this user
+    const CallSchedule = require('../models/CallSchedule');
+    const deletedCallSchedules = await CallSchedule.deleteMany({ scheduledBy: userId });
+    
+    // Delete all chats associated with this user
+    const Chat = require('../models/Chat');
+    const deletedChats = await Chat.deleteMany({ userId: userId });
+    
+    // Delete all customers created by this user
+    const Customer = require('../models/Customer');
+    const deletedCustomers = await Customer.deleteMany({ userId: userId });
+    
+    // Finally, delete the user
+    await User.findByIdAndDelete(userId);
+    
+    res.json({
+      success: true,
+      message: 'User and all associated data permanently deleted'
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Server error during user deletion' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -290,5 +342,6 @@ module.exports = {
   getAllUsers,
   updateUserRole,
   getSystemStats,
-  checkFirstUser
-}; 
+  checkFirstUser,
+  deleteUser
+};

@@ -43,6 +43,12 @@ callScheduleSchema.index({ scheduledBy: 1 });
 callScheduleSchema.index({ scheduledDate: 1 });
 callScheduleSchema.index({ status: 1 });
 
+// Create unique compound index to prevent duplicate schedules
+callScheduleSchema.index(
+  { leadId: 1, scheduledDate: 1, scheduledTime: 1, status: 1 }, 
+  { unique: true, name: 'unique_call_schedule' }
+);
+
 // Method to get call schedule without sensitive fields
 callScheduleSchema.methods.toJSON = function() {
   const callSchedule = this.toObject();
@@ -58,7 +64,14 @@ callScheduleSchema.statics.findUpcoming = function(userId) {
     scheduledBy: userId,
     scheduledDate: { $gte: today },
     status: 'Scheduled'
-  }).populate('leadId', 'name email phone company status');
+  }).populate({
+    path: 'leadId',
+    select: 'name email phone company status',
+    populate: {
+      path: 'createdBy',
+      select: 'name email'
+    }
+  });
 };
 
 // Static method to find calls by date range
@@ -66,7 +79,14 @@ callScheduleSchema.statics.findByDateRange = function(userId, startDate, endDate
   return this.find({
     scheduledBy: userId,
     scheduledDate: { $gte: startDate, $lte: endDate }
-  }).populate('leadId', 'name email phone company status');
+  }).populate({
+    path: 'leadId',
+    select: 'name email phone company status',
+    populate: {
+      path: 'createdBy',
+      select: 'name email'
+    }
+  });
 };
 
 // Static method to get call statistics

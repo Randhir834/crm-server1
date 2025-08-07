@@ -6,11 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "NODE_OPTIONS='--no-deprecation' node index.js",
-    "dev": "NODE_OPTIONS='--no-deprecation' nodemon index.js",
-    "setup": "node setup.js",
-    "init-db": "node init-db.js",
-    "create-admin": "node create-admin.js",
-    "test-email": "node test-email.js"
+    "dev": "NODE_OPTIONS='--no-deprecation' nodemon index.js"
   },
   "keywords": [],
   "author": "",

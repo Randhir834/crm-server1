@@ -30,24 +30,6 @@ router.get('/updates', auth, getSessionUpdates);
 // Get all user sessions (admin only)
 router.get('/all', auth, admin, getAllUserSessions);
 
-// Test endpoint to manually end current session
-router.post('/test-end', auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    console.log('Test ending session for user:', userId);
-    
-    const session = await Session.getCurrentSession(userId);
-    if (session) {
-      await session.endSession();
-      console.log('Test session ended:', session.logoutTime);
-      res.json({ success: true, logoutTime: session.logoutTime });
-    } else {
-      res.json({ success: false, message: 'No active session' });
-    }
-  } catch (error) {
-    console.error('Test end session error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+
 
 module.exports = router;

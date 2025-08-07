@@ -224,14 +224,28 @@ const getChatByCallSchedule = async (req, res) => {
     console.log('👤 User ID:', req.user._id);
 
     // First, let's check if the call schedule exists at all
-    const allCallSchedules = await CallSchedule.find({}).populate('leadId', 'name email company');
+    const allCallSchedules = await CallSchedule.find({}).populate({
+      path: 'leadId',
+      select: 'name email company',
+      populate: {
+        path: 'createdBy',
+        select: 'name email'
+      }
+    });
     console.log('📋 All call schedules:', allCallSchedules.map(cs => ({ id: cs._id, scheduledBy: cs.scheduledBy, leadName: cs.leadId?.name })));
 
     // Find the call schedule
     const callSchedule = await CallSchedule.findOne({
       _id: callScheduleId,
       scheduledBy: req.user._id
-    }).populate('leadId', 'name email company');
+    }).populate({
+      path: 'leadId',
+      select: 'name email company',
+      populate: {
+        path: 'createdBy',
+        select: 'name email'
+      }
+    });
 
     console.log('🎯 Found call schedule:', callSchedule);
 
@@ -239,7 +253,14 @@ const getChatByCallSchedule = async (req, res) => {
       // Let's also check if it exists without user filter
       const callScheduleWithoutUser = await CallSchedule.findOne({
         _id: callScheduleId
-      }).populate('leadId', 'name email company');
+      }).populate({
+        path: 'leadId',
+        select: 'name email company',
+        populate: {
+          path: 'createdBy',
+          select: 'name email'
+        }
+      });
       
       if (callScheduleWithoutUser) {
         console.log('⚠️ Call schedule exists but belongs to different user');

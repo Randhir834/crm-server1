@@ -34,8 +34,7 @@ app.use('/api/chats', chatRoutes);
 // MongoDB Atlas connection with proper options
 const connectDB = async () => {
   try {
-    console.log('🔌 Connecting to MongoDB Atlas...');
-    console.log('📊 Database URI:', process.env.MONGO_URI ? 'Configured' : 'Missing');
+
     
     if (!process.env.MONGO_URI) {
       throw new Error('MONGO_URI is not configured in .env file');
@@ -45,22 +44,16 @@ const connectDB = async () => {
       dbName: 'CRM' // Explicitly set database name
     });
     
-    console.log(`✅ MongoDB Atlas Connected: ${conn.connection.host}`);
-    console.log(`📊 Database: ${conn.connection.name}`);
+    
     
     // Start server only after successful database connection
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌐 API URL: http://localhost:${PORT}`);
+      
     });
     
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
-    console.log('\n💡 Troubleshooting tips:');
-    console.log('1. Check your MONGO_URI in .env file');
-    console.log('2. Verify your MongoDB Atlas credentials');
-    console.log('3. Ensure network access is configured in Atlas');
-    console.log('4. Make sure the database name is "CRM"');
+    
     process.exit(1);
   }
 };
@@ -71,13 +64,13 @@ mongoose.connection.on('error', (err) => {
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('⚠️ MongoDB disconnected');
+  
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
-  console.log('📴 MongoDB connection closed through app termination');
+  
   process.exit(0);
 });
 

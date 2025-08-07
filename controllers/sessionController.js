@@ -5,7 +5,7 @@ const User = require('../models/User');
 // Create a new session when user logs in
 const createSession = async (req, res) => {
   try {
-    const userId = req.user.id; // Get userId from authenticated user
+    const userId = req.user._id; // Get userId from authenticated user
     
     // End any existing active session for this user
     await Session.updateMany(
@@ -48,7 +48,7 @@ const createSession = async (req, res) => {
 // End current session when user logs out
 const endSession = async (req, res) => {
   try {
-    const userId = req.user.id; // Get userId from authenticated user
+    const userId = req.user._id; // Get userId from authenticated user
     console.log('Ending session for user:', userId);
     
     const session = await Session.getCurrentSession(userId);
@@ -90,7 +90,7 @@ const endSession = async (req, res) => {
 // Get user's session statistics
 const getSessionStats = async (req, res) => {
   try {
-    const userId = req.user.id; // Get userId from authenticated user
+    const userId = req.user._id; // Get userId from authenticated user
     console.log('Getting session stats for user:', userId);
     
     // Get current active session
@@ -177,7 +177,7 @@ const getSessionStats = async (req, res) => {
 // Get current session info
 const getCurrentSession = async (req, res) => {
   try {
-    const userId = req.user.id; // Get userId from authenticated user
+    const userId = req.user._id; // Get userId from authenticated user
     
     const session = await Session.getCurrentSession(userId);
     
@@ -210,7 +210,7 @@ const getCurrentSession = async (req, res) => {
 // Get real-time session updates (for polling)
 const getSessionUpdates = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id;
     
     // Get current session and user info
     const currentSession = await Session.getCurrentSession(userId);

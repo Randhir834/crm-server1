@@ -84,7 +84,7 @@ const createCustomer = async (req, res) => {
 
     await customer.save();
 
-    console.log(`✅ New customer created: ${email}`);
+
 
     res.status(201).json({
       success: true,
@@ -140,7 +140,7 @@ const updateCustomer = async (req, res) => {
 
     await customer.save();
 
-    console.log(`✅ Customer updated: ${customer.email}`);
+
 
     res.json({
       success: true,
@@ -169,7 +169,7 @@ const deleteCustomer = async (req, res) => {
 
     await customer.deleteOne();
 
-    console.log(`✅ Customer deleted: ${customer.email}`);
+
 
     res.json({
       success: true,
@@ -231,7 +231,7 @@ const convertLeadToCustomer = async (req, res) => {
     lead.status = 'Converted';
     await lead.save();
 
-    console.log(`✅ Lead converted to customer: ${lead.email}`);
+
 
     res.status(201).json({
       success: true,

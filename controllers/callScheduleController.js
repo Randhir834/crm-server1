@@ -1,12 +1,13 @@
 const CallSchedule = require('../models/CallSchedule');
 const Lead = require('../models/Lead');
+const User = require('../models/User');
 const mongoose = require('mongoose');
 
 // Create a new call schedule
 const createCallSchedule = async (req, res) => {
   try {
     const { leadId, scheduledDate, scheduledTime, duration } = req.body;
-    const userId = req.user.id;
+    const userId = req.user._id;
     
         console.log('Creating call schedule:', { leadId, scheduledDate, scheduledTime, duration, userId });
     
@@ -16,24 +17,20 @@ const createCallSchedule = async (req, res) => {
       return res.status(400).json({ message: 'Invalid lead ID format' });
     }
     
-    // Validate that the lead exists and belongs to the user
-    let lead = await Lead.findOne({ _id: leadId, createdBy: userId, isActive: true });
-    console.log('Lead found with createdBy:', lead ? 'Yes' : 'No');
+    // Validate that the lead exists
+    let lead = await Lead.findOne({ _id: leadId, isActive: true });
+    console.log('Lead found:', lead ? 'Yes' : 'No');
     
-    // If not found with createdBy, try to find the lead without createdBy check
     if (!lead) {
-      lead = await Lead.findOne({ _id: leadId, isActive: true });
-      console.log('Lead found without createdBy:', lead ? 'Yes' : 'No');
-      if (!lead) {
-        console.log('Lead not found at all');
-        return res.status(404).json({ message: 'Lead not found' });
-      }
-      // Update the lead with the current user as createdBy if not set
-      if (!lead.createdBy) {
-        lead.createdBy = userId;
-        await lead.save();
-        console.log('Updated lead with createdBy');
-      }
+      console.log('Lead not found');
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+    
+    // Update the lead with the current user as createdBy if not set
+    if (!lead.createdBy) {
+      lead.createdBy = userId;
+      await lead.save();
+      console.log('Updated lead with createdBy:', userId);
     }
 
     // Check if there's already a scheduled call for this lead at the same time
@@ -41,12 +38,20 @@ const createCallSchedule = async (req, res) => {
       leadId,
       scheduledDate: new Date(scheduledDate),
       scheduledTime,
-      status: 'Scheduled',
+      status: { $in: ['Scheduled', 'Completed'] }, // Check both scheduled and completed calls
       isActive: true
     });
 
     if (existingCall) {
-      return res.status(400).json({ message: 'A call is already scheduled for this lead at this time' });
+      return res.status(400).json({ 
+        message: 'A call is already scheduled for this lead at this time',
+        existingCall: {
+          id: existingCall._id,
+          scheduledDate: existingCall.scheduledDate,
+          scheduledTime: existingCall.scheduledTime,
+          status: existingCall.status
+        }
+      });
     }
 
     const callSchedule = new CallSchedule({
@@ -60,7 +65,14 @@ const createCallSchedule = async (req, res) => {
     await callSchedule.save();
 
     // Populate lead details for response
-    await callSchedule.populate('leadId', 'name email phone company status');
+    await callSchedule.populate({
+      path: 'leadId',
+      select: 'name email phone company status',
+      populate: {
+        path: 'createdBy',
+        select: 'name email'
+      }
+    });
 
     res.status(201).json({
       message: 'Call scheduled successfully',
@@ -68,6 +80,15 @@ const createCallSchedule = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating call schedule:', error);
+    
+    // Handle unique constraint violation
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'A call is already scheduled for this lead at this time',
+        error: 'DUPLICATE_SCHEDULE'
+      });
+    }
+    
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -78,7 +99,13 @@ const getCallSchedules = async (req, res) => {
     const userId = req.user._id;
     const { status, date } = req.query;
 
-    let query = { scheduledBy: userId };
+    // Build query based on user role
+    let query = {};
+    
+    // If user is not admin, only show their own scheduled calls
+    if (req.user.role !== 'admin') {
+      query.scheduledBy = userId;
+    }
 
     // Filter by status if provided
     if (status) {
@@ -95,11 +122,31 @@ const getCallSchedules = async (req, res) => {
     }
 
     const callSchedules = await CallSchedule.find(query)
-      .populate('leadId', 'name email phone company status')
+      .populate({
+        path: 'leadId',
+        select: 'name email phone company status createdBy',
+        populate: {
+          path: 'createdBy',
+          select: 'name email'
+        }
+      })
+      .populate('scheduledBy', 'name email')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
+
+    // Ensure all leads have valid createdBy data
+    for (const schedule of callSchedules) {
+      if (schedule.leadId && (!schedule.leadId.createdBy || !schedule.leadId.createdBy.name)) {
+        // If createdBy is missing or invalid, try to find the user who scheduled the call
+        const scheduledByUser = await User.findById(schedule.scheduledBy).select('name email');
+        if (scheduledByUser) {
+          schedule.leadId.createdBy = scheduledByUser;
+        }
+      }
+    }
 
     console.log('Returning call schedules:', {
       count: callSchedules.length,
+      userRole: req.user.role,
       schedules: callSchedules.map(s => ({ id: s._id, isActive: s.isActive, status: s.status }))
     });
 
@@ -120,7 +167,26 @@ const getUpcomingCalls = async (req, res) => {
     const userId = req.user._id;
     const { limit = 10 } = req.query;
 
-    const upcomingCalls = await CallSchedule.findUpcoming(userId)
+    // Build query based on user role
+    let query = {};
+    
+    // If user is not admin, only show their own upcoming calls
+    if (req.user.role !== 'admin') {
+      query.scheduledBy = userId;
+    }
+
+    const upcomingCalls = await CallSchedule.find(query)
+      .populate({
+        path: 'leadId',
+        select: 'name email phone company status',
+        populate: {
+          path: 'createdBy',
+          select: 'name email'
+        }
+      })
+      .populate('scheduledBy', 'name email')
+      .where('scheduledDate').gte(new Date())
+      .where('status').equals('Scheduled')
       .limit(parseInt(limit))
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
@@ -141,13 +207,25 @@ const getCallSchedule = async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
 
-    const callSchedule = await CallSchedule.findOne({
-      _id: id,
-      scheduledBy: userId
-    }).populate('leadId', 'name email phone company status');
+    // Build query based on user role
+    let query = { _id: id };
+    
+    // If user is not admin, only allow access to their own scheduled calls
+    if (req.user.role !== 'admin') {
+      query.scheduledBy = userId;
+    }
+
+    const callSchedule = await CallSchedule.findOne(query).populate({
+      path: 'leadId',
+      select: 'name email phone company status',
+      populate: {
+        path: 'createdBy',
+        select: 'name email'
+      }
+    });
 
     if (!callSchedule) {
-      return res.status(404).json({ message: 'Call schedule not found' });
+      return res.status(404).json({ message: 'Call schedule not found or you are not authorized to view it' });
     }
 
     res.json({ 
@@ -164,16 +242,21 @@ const getCallSchedule = async (req, res) => {
 const updateCallSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user._id;
     const { scheduledDate, scheduledTime, duration, status } = req.body;
 
-    const callSchedule = await CallSchedule.findOne({
-      _id: id,
-      scheduledBy: userId
-    });
+    // Build query based on user role
+    let query = { _id: id };
+    
+    // If user is not admin, only allow updates to their own scheduled calls
+    if (req.user.role !== 'admin') {
+      query.scheduledBy = userId;
+    }
+
+    const callSchedule = await CallSchedule.findOne(query);
 
     if (!callSchedule) {
-      return res.status(404).json({ message: 'Call schedule not found' });
+      return res.status(404).json({ message: 'Call schedule not found or you are not authorized to update it' });
     }
 
     // Update fields if provided
@@ -183,7 +266,14 @@ const updateCallSchedule = async (req, res) => {
     if (status) callSchedule.status = status;
 
     await callSchedule.save();
-    await callSchedule.populate('leadId', 'name email phone company status');
+    await callSchedule.populate({
+      path: 'leadId',
+      select: 'name email phone company status',
+      populate: {
+        path: 'createdBy',
+        select: 'name email'
+      }
+    });
 
     res.json({
       message: 'Call schedule updated successfully',
@@ -199,9 +289,9 @@ const updateCallSchedule = async (req, res) => {
 const deleteCallSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user._id;
     
-    console.log('Deleting call schedule:', { id, userId });
+    console.log('Deleting call schedule:', { id, userId, userRole: req.user.role });
 
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -209,14 +299,19 @@ const deleteCallSchedule = async (req, res) => {
       return res.status(400).json({ message: 'Invalid call schedule ID format' });
     }
 
-    const callSchedule = await CallSchedule.findOne({
-      _id: id,
-      scheduledBy: userId
-    });
+    // Build query based on user role
+    let query = { _id: id };
+    
+    // If user is not admin, only allow deletion of their own scheduled calls
+    if (req.user.role !== 'admin') {
+      query.scheduledBy = userId;
+    }
+
+    const callSchedule = await CallSchedule.findOne(query);
 
     if (!callSchedule) {
-      console.log('Call schedule not found');
-      return res.status(404).json({ message: 'Call schedule not found' });
+      console.log('Call schedule not found or user not authorized');
+      return res.status(404).json({ message: 'Call schedule not found or you are not authorized to delete it' });
     }
 
     console.log('Found call schedule to delete:', callSchedule._id);
@@ -238,8 +333,16 @@ const getCallStats = async (req, res) => {
   try {
     const userId = req.user._id;
 
+    // Build match condition based on user role
+    let matchCondition = {};
+    
+    // If user is not admin, only show their own stats
+    if (req.user.role !== 'admin') {
+      matchCondition.scheduledBy = userId;
+    }
+
     const stats = await CallSchedule.aggregate([
-      { $match: { scheduledBy: userId } },
+      { $match: matchCondition },
       {
         $group: {
           _id: '$status',
@@ -258,7 +361,7 @@ const getCallStats = async (req, res) => {
     };
 
     // Calculate total
-    const totalCalls = await CallSchedule.countDocuments({ scheduledBy: userId });
+    const totalCalls = await CallSchedule.countDocuments(matchCondition);
     formattedStats.total = totalCalls;
 
     stats.forEach(stat => {
@@ -268,7 +371,7 @@ const getCallStats = async (req, res) => {
       }
     });
 
-    console.log('Call stats for user:', userId, formattedStats);
+    console.log('Call stats for user:', userId, 'role:', req.user.role, formattedStats);
 
     res.json({ 
       success: true,

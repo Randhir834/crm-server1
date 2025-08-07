@@ -5,32 +5,7 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Test route to check if chat routes are working
-router.get('/test', (req, res) => {
-  res.json({ message: 'Chat routes are working!' });
-});
 
-// Test route to check call schedules (no auth required for debugging)
-router.get('/debug/call-schedules', async (req, res) => {
-  try {
-    const CallSchedule = require('../models/CallSchedule');
-    const callSchedules = await CallSchedule.find({}).populate('leadId', 'name email');
-    res.json({ 
-      message: 'Call schedules found',
-      count: callSchedules.length,
-      schedules: callSchedules.map(cs => ({
-        id: cs._id,
-        userId: cs.userId,
-        leadName: cs.leadId?.name,
-        leadEmail: cs.leadId?.email,
-        scheduledDate: cs.scheduledDate,
-        scheduledTime: cs.scheduledTime
-      }))
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching call schedules', error: error.message });
-  }
-});
 
 // Apply auth middleware to all routes
 router.use(auth);
