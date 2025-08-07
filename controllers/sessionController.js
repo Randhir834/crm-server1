@@ -267,10 +267,93 @@ const getSessionUpdates = async (req, res) => {
   }
 };
 
+// Get all user sessions (admin only)
+const getAllUserSessions = async (req, res) => {
+  try {
+    console.log('Getting all user sessions for admin');
+    // Get all users with their sessions - User is already imported at the top
+    
+    // Find all users
+    const users = await User.find({}, 'name email role lastLogin').lean();
+    console.log(`Found ${users.length} users`);
+    
+    // For each user, get their session data
+    const usersWithSessions = await Promise.all(users.map(async (user) => {
+      try {
+        // Get the user's current active session if any
+        const currentSession = await Session.findOne({ 
+          userId: new mongoose.Types.ObjectId(user._id), 
+          isActive: true 
+        }).lean();
+        
+        // Get the user's most recent completed session
+        const lastCompletedSession = await Session.findOne({
+          userId: new mongoose.Types.ObjectId(user._id),
+          isActive: false,
+          logoutTime: { $ne: null }
+        }).sort({ logoutTime: -1 }).lean();
+        
+        // Calculate total time spent by the user
+        const totalTimeResult = await Session.getTotalSessionTime(user._id);
+        const totalSessionTime = totalTimeResult[0]?.totalDuration || 0;
+        
+        // Calculate current session duration if active
+        let currentSessionDuration = 0;
+        if (currentSession) {
+          currentSessionDuration = Date.now() - currentSession.loginTime.getTime();
+        }
+        
+        return {
+          ...user,
+          sessions: {
+            current: currentSession ? {
+              id: currentSession._id,
+              loginTime: currentSession.loginTime,
+              duration: currentSessionDuration
+            } : null,
+            lastCompleted: lastCompletedSession ? {
+              id: lastCompletedSession._id,
+              loginTime: lastCompletedSession.loginTime,
+              logoutTime: lastCompletedSession.logoutTime,
+              duration: lastCompletedSession.duration
+            } : null,
+            totalSessionTime: totalSessionTime + (currentSession ? currentSessionDuration : 0)
+          }
+        };
+      } catch (err) {
+        console.error(`Error processing sessions for user ${user._id}:`, err);
+        // Return user with empty sessions object to avoid breaking the entire response
+        return {
+          ...user,
+          sessions: {
+            current: null,
+            lastCompleted: null,
+            totalSessionTime: 0
+          }
+        };
+      }
+    }));
+    
+    console.log(`Successfully processed ${usersWithSessions.length} users with sessions`);
+    res.json({
+      success: true,
+      users: usersWithSessions
+    });
+  } catch (error) {
+    console.error('Error getting all user sessions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user sessions',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createSession,
   endSession,
   getSessionStats,
   getCurrentSession,
-  getSessionUpdates
-}; 
+  getSessionUpdates,
+  getAllUserSessions
+};

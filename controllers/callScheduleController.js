@@ -5,10 +5,10 @@ const mongoose = require('mongoose');
 // Create a new call schedule
 const createCallSchedule = async (req, res) => {
   try {
-    const { leadId, scheduledDate, scheduledTime, duration, notes } = req.body;
+    const { leadId, scheduledDate, scheduledTime, duration } = req.body;
     const userId = req.user.id;
     
-        console.log('Creating call schedule:', { leadId, scheduledDate, scheduledTime, duration, notes, userId });
+        console.log('Creating call schedule:', { leadId, scheduledDate, scheduledTime, duration, userId });
     
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(leadId)) {
@@ -54,8 +54,7 @@ const createCallSchedule = async (req, res) => {
       scheduledBy: userId,
       scheduledDate: new Date(scheduledDate),
       scheduledTime,
-      duration: duration || 30,
-      notes: notes || ''
+      duration: duration || 30
     });
 
     await callSchedule.save();
@@ -166,7 +165,7 @@ const updateCallSchedule = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { scheduledDate, scheduledTime, duration, notes, status } = req.body;
+    const { scheduledDate, scheduledTime, duration, status } = req.body;
 
     const callSchedule = await CallSchedule.findOne({
       _id: id,
@@ -181,7 +180,6 @@ const updateCallSchedule = async (req, res) => {
     if (scheduledDate) callSchedule.scheduledDate = new Date(scheduledDate);
     if (scheduledTime) callSchedule.scheduledTime = scheduledTime;
     if (duration) callSchedule.duration = duration;
-    if (notes !== undefined) callSchedule.notes = notes;
     if (status) callSchedule.status = status;
 
     await callSchedule.save();
@@ -293,4 +291,4 @@ module.exports = {
   updateCallSchedule,
   deleteCallSchedule,
   getCallStats
-}; 
+};

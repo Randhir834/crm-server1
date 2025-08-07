@@ -23,11 +23,6 @@ const callScheduleSchema = new mongoose.Schema({
     type: Number, // in minutes
     default: 30
   },
-  notes: {
-    type: String,
-    trim: true,
-    default: ''
-  },
   status: {
     type: String,
     enum: ['Scheduled', 'Completed', 'Cancelled', 'No Show'],
@@ -87,4 +82,4 @@ callScheduleSchema.statics.getStats = function(userId) {
   ]);
 };
 
-module.exports = mongoose.model('CallSchedule', callScheduleSchema); 
+module.exports = mongoose.model('CallSchedule', callScheduleSchema);

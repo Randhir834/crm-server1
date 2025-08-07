@@ -59,12 +59,12 @@ sessionSchema.methods.endSession = function() {
 
 // Static method to get user's current session
 sessionSchema.statics.getCurrentSession = function(userId) {
-  return this.findOne({ userId: mongoose.Types.ObjectId(userId), isActive: true });
+  return this.findOne({ userId: new mongoose.Types.ObjectId(userId), isActive: true });
 };
 
 // Static method to get user's session history
 sessionSchema.statics.getUserSessions = function(userId, limit = 10) {
-  return this.find({ userId: mongoose.Types.ObjectId(userId) })
+  return this.find({ userId: new mongoose.Types.ObjectId(userId) })
     .sort({ loginTime: -1 })
     .limit(limit);
 };
@@ -72,9 +72,9 @@ sessionSchema.statics.getUserSessions = function(userId, limit = 10) {
 // Static method to get user's total session time
 sessionSchema.statics.getTotalSessionTime = function(userId) {
   return this.aggregate([
-    { $match: { userId: mongoose.Types.ObjectId(userId), logoutTime: { $ne: null } } },
+    { $match: { userId: new mongoose.Types.ObjectId(userId), logoutTime: { $ne: null } } },
     { $group: { _id: null, totalDuration: { $sum: '$duration' } } }
   ]);
 };
 
-module.exports = mongoose.model('Session', sessionSchema); 
+module.exports = mongoose.model('Session', sessionSchema);
