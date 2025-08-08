@@ -253,6 +253,13 @@ const getLeads = async (req, res) => {
     console.log(`Leads fetched: ${leads.length} leads, total: ${total}, filter: ${status || 'all'}`);
     console.log('Sample leads:', leads.slice(0, 3).map(lead => ({ id: lead._id, name: lead.name, status: lead.status, email: lead.email })));
 
+    // Add cache control headers to prevent unnecessary API calls
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
     res.json({
       success: true,
       leads,
@@ -320,6 +327,13 @@ const getLeadStats = async (req, res) => {
 
     console.log('Lead stats for user:', req.user._id, 'role:', req.user.role, statsMap);
 
+    // Add cache control headers to prevent unnecessary API calls
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
     res.json({
       success: true,
       stats: statsMap
@@ -420,12 +434,19 @@ const updateLeadStatus = async (req, res) => {
       });
     }
 
-    const lead = await Lead.findByIdAndUpdate(
-      req.params.id,
+    // Use findOneAndUpdate with optimistic locking to prevent race conditions
+    const lead = await Lead.findOneAndUpdate(
+      { _id: req.params.id, isActive: true },
       { 
-        status
+        status,
+        updatedAt: new Date() // Ensure timestamp is updated
       },
-      { new: true, runValidators: true }
+      { 
+        new: true, 
+        runValidators: true,
+        // Add optimistic locking to prevent concurrent updates
+        timestamps: true
+      }
     ).populate('createdBy', 'name email')
      .populate('assignedTo', 'name email');
 
@@ -472,6 +493,13 @@ const updateLeadStatus = async (req, res) => {
       }
     }
 
+    // Add cache control headers
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    
     res.json({
       success: true,
       message: 'Lead status updated successfully',

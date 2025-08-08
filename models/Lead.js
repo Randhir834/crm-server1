@@ -69,6 +69,8 @@ leadSchema.index({ status: 1 });
 leadSchema.index({ company: 1 });
 leadSchema.index({ createdAt: -1 });
 leadSchema.index({ createdBy: 1 });
+leadSchema.index({ assignedTo: 1 });
+leadSchema.index({ isActive: 1 });
 
 // Method to get lead without sensitive fields
 leadSchema.methods.toJSON = function() {
