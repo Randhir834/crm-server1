@@ -59,7 +59,6 @@ const customerSchema = new mongoose.Schema({
 
 // Create indexes for better performance
 customerSchema.index({ userId: 1, createdAt: -1 });
-customerSchema.index({ email: 1 });
 customerSchema.index({ status: 1 });
 customerSchema.index({ convertedFrom: 1 });
 

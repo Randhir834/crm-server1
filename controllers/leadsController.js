@@ -131,7 +131,8 @@ const uploadLeads = async (req, res) => {
         status: columnIndexes.status ? (row[columnIndexes.status] ? row[columnIndexes.status].toString().trim() : 'New') : 'New',
         source: columnIndexes.source ? (row[columnIndexes.source] ? row[columnIndexes.source].toString().trim() : 'Import') : 'Import',
         notes: columnIndexes.notes ? (row[columnIndexes.notes] ? row[columnIndexes.notes].toString().trim() : '') : '',
-        createdBy: req.user._id
+        createdBy: req.user._id,
+        assignedTo: req.body.assignedTo || null
       };
 
       // Validate lead data
@@ -215,9 +216,12 @@ const getLeads = async (req, res) => {
     // Build query based on user role
     let query = { isActive: true };
     
-    // If user is not admin, only show their own leads
+    // If user is not admin, only show leads assigned to them or created by them
     if (req.user.role !== 'admin') {
-      query.createdBy = req.user._id;
+      query.$or = [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ];
     }
 
     if (status) {
@@ -276,9 +280,12 @@ const getLeadStats = async (req, res) => {
     // Build match condition based on user role
     let matchCondition = { isActive: true };
     
-    // If user is not admin, only show their own stats
+    // If user is not admin, only show stats for leads assigned to them or created by them
     if (req.user.role !== 'admin') {
-      matchCondition.createdBy = req.user._id;
+      matchCondition.$or = [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ];
     }
 
     const stats = await Lead.aggregate([

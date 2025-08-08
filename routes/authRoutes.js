@@ -187,32 +187,18 @@ router.post('/logout', auth, async (req, res) => {
     // End the current session
     const userId = req.user._id;
 
-    
     // Find and end the current active session
     const session = await Session.findOne({ 
       userId: userId, 
       isActive: true 
     });
     
-    
-      sessionId: session._id,
-      loginTime: session.loginTime,
-      isActive: session.isActive
-    } : 'No active session found');
-    
     if (session) {
       session.logoutTime = new Date();
       session.isActive = false;
       session.duration = session.logoutTime.getTime() - session.loginTime.getTime();
       await session.save();
-      
-        sessionId: session._id,
-        logoutTime: session.logoutTime,
-        duration: session.duration
-      });
     }
-    
-
     
     res.json({ message: 'Logged out successfully' });
   } catch (error) {

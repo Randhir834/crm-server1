@@ -147,7 +147,14 @@ const getCallSchedules = async (req, res) => {
     console.log('Returning call schedules:', {
       count: callSchedules.length,
       userRole: req.user.role,
-      schedules: callSchedules.map(s => ({ id: s._id, isActive: s.isActive, status: s.status }))
+      userId: req.user._id,
+      query: query,
+      schedules: callSchedules.map(s => ({ 
+        id: s._id, 
+        leadName: s.leadId?.name,
+        scheduledBy: s.scheduledBy?.name,
+        status: s.status 
+      }))
     });
 
     res.json({
