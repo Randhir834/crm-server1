@@ -188,12 +188,33 @@ const uploadLeads = async (req, res) => {
     // Insert leads
     const insertedLeads = await Lead.insertMany(leads);
 
-    res.status(201).json({
-      success: true,
-      message: `Successfully imported ${insertedLeads.length} leads`,
-      count: insertedLeads.length,
-      leads: insertedLeads
-    });
+    console.log(`✅ Successfully inserted ${insertedLeads.length} leads`);
+
+    // Fetch the inserted leads with populated user data
+    try {
+      const populatedLeads = await Lead.find({ _id: { $in: insertedLeads.map(lead => lead._id) } })
+        .populate('createdBy', 'name email')
+        .populate('assignedTo', 'name email')
+        .sort({ createdAt: -1 });
+
+      console.log(`✅ Fetched ${populatedLeads.length} leads with populated user data`);
+
+      res.status(201).json({
+        success: true,
+        message: `Successfully imported ${insertedLeads.length} leads`,
+        count: insertedLeads.length,
+        leads: populatedLeads
+      });
+    } catch (populateError) {
+      console.error('❌ Error populating user data:', populateError);
+      // Fallback to unpopulated leads if population fails
+      res.status(201).json({
+        success: true,
+        message: `Successfully imported ${insertedLeads.length} leads`,
+        count: insertedLeads.length,
+        leads: insertedLeads
+      });
+    }
 
   } catch (error) {
     console.error('Upload leads error:', error);
