@@ -62,7 +62,7 @@ router.post('/forgot-password', [
       return res.status(400).json({ message: errors.array()[0].msg });
     }
 
-    const { email } = req.body;
+    const { email, clientUrl: requestClientUrl } = req.body;
 
     // Find user by email
     const user = await User.findOne({ email });
@@ -77,8 +77,8 @@ router.post('/forgot-password', [
     const resetToken = user.generatePasswordResetToken();
     await user.save();
 
-    // Create reset URL
-    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    // Create reset URL - use environment variable, request client URL, or fallback
+    const resetUrl = `${requestClientUrl || process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
     // Email content
     const mailOptions = {
