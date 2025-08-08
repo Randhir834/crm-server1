@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  firstLoginTime: {
+    type: Date,
+    default: null
+  },
 
 }, {
   timestamps: true,
@@ -124,6 +128,18 @@ userSchema.methods.updateLastLogin = function() {
   return this.save();
 };
 
+// Update first login time of the day
+userSchema.methods.updateFirstLoginTime = function() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // If firstLoginTime is null or from a previous day, update it
+  if (!this.firstLoginTime || this.firstLoginTime < today) {
+    this.firstLoginTime = now;
+  }
+  
+  return this.save();
+};
 
 
 module.exports = mongoose.model('User', userSchema); 

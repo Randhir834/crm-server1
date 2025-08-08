@@ -29,6 +29,12 @@ const createSession = async (req, res) => {
     // Update user's lastLogin
     await User.findByIdAndUpdate(mongoose.Types.ObjectId(userId), { lastLogin: new Date() });
 
+    // Update user's first login time of the day
+    const user = await User.findById(mongoose.Types.ObjectId(userId));
+    if (user) {
+      await user.updateFirstLoginTime();
+    }
+
     res.status(201).json({
       success: true,
       session: {
@@ -134,6 +140,26 @@ const getSessionStats = async (req, res) => {
       currentSessionDuration = Date.now() - currentSession.loginTime.getTime();
     }
     
+    // Calculate daily usage (sessions from today only)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    
+    const dailySessions = await Session.find({
+      userId: mongoose.Types.ObjectId(userId),
+      loginTime: { $gte: today }
+    });
+    
+    let dailyUsage = 0;
+    dailySessions.forEach(session => {
+      if (session.logoutTime && session.duration) {
+        dailyUsage += session.duration;
+      } else if (session.isActive) {
+        // For active sessions, calculate duration up to now
+        const currentDuration = Date.now() - session.loginTime.getTime();
+        dailyUsage += currentDuration;
+      }
+    });
+    
     // Total usage includes completed sessions + current session
     const totalUsage = totalSessionTime + currentSessionDuration;
     
@@ -158,7 +184,7 @@ const getSessionStats = async (req, res) => {
           duration: session.duration,
           isActive: session.isActive
         })),
-        totalSessionTime: totalUsage, // Use total usage instead of just completed sessions
+        totalSessionTime: dailyUsage, // Use daily usage instead of total
         last24HoursUsage: last24HoursUsage, // Time spent in last 24 hours
         totalSessions: recentSessions.length
       }
@@ -243,6 +269,26 @@ const getSessionUpdates = async (req, res) => {
       }
     });
     
+    // Calculate daily usage (sessions from today only)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    
+    const dailySessions = await Session.find({
+      userId: mongoose.Types.ObjectId(userId),
+      loginTime: { $gte: today }
+    });
+    
+    let dailyUsage = 0;
+    dailySessions.forEach(session => {
+      if (session.logoutTime && session.duration) {
+        dailyUsage += session.duration;
+      } else if (session.isActive) {
+        // For active sessions, calculate duration up to now
+        const currentDuration = Date.now() - session.loginTime.getTime();
+        dailyUsage += currentDuration;
+      }
+    });
+    
     // Last 24 hours usage
     const last24HoursUsage = last24HoursTime + (currentSession ? currentSessionDuration : 0);
     
@@ -254,7 +300,7 @@ const getSessionUpdates = async (req, res) => {
           loginTime: currentSession.loginTime,
           duration: currentSessionDuration
         } : null,
-        last24HoursUsage,
+        dailyUsage, // Use daily usage instead of 24-hour usage
         lastUpdated: new Date()
       }
     });
@@ -274,7 +320,7 @@ const getAllUserSessions = async (req, res) => {
     // Get all users with their sessions - User is already imported at the top
     
     // Find all users
-    const users = await User.find({}, 'name email role lastLogin').lean();
+    const users = await User.find({}, 'name email role lastLogin firstLoginTime').lean();
     console.log(`Found ${users.length} users`);
     
     // For each user, get their session data
@@ -297,6 +343,26 @@ const getAllUserSessions = async (req, res) => {
         const totalTimeResult = await Session.getTotalSessionTime(user._id);
         const totalSessionTime = totalTimeResult[0]?.totalDuration || 0;
         
+        // Calculate daily usage (sessions from today only)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+        
+        const dailySessions = await Session.find({
+          userId: new mongoose.Types.ObjectId(user._id),
+          loginTime: { $gte: today }
+        }).lean();
+        
+        let dailyUsage = 0;
+        dailySessions.forEach(session => {
+          if (session.logoutTime && session.duration) {
+            dailyUsage += session.duration;
+          } else if (session.isActive) {
+            // For active sessions, calculate duration up to now
+            const currentDuration = Date.now() - session.loginTime.getTime();
+            dailyUsage += currentDuration;
+          }
+        });
+        
         // Calculate current session duration if active
         let currentSessionDuration = 0;
         if (currentSession) {
@@ -317,7 +383,7 @@ const getAllUserSessions = async (req, res) => {
               logoutTime: lastCompletedSession.logoutTime,
               duration: lastCompletedSession.duration
             } : null,
-            totalSessionTime: totalSessionTime + (currentSession ? currentSessionDuration : 0)
+            totalSessionTime: dailyUsage // Use daily usage instead of total
           }
         };
       } catch (err) {

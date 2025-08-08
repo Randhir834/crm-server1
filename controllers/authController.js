@@ -98,6 +98,9 @@ const login = async (req, res) => {
     // Update last login
     await user.updateLastLogin();
 
+    // Update first login time of the day
+    await user.updateFirstLoginTime();
+
     // End any existing active sessions for this user
     await Session.updateMany(
       { userId: user._id, isActive: true },
@@ -131,7 +134,8 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        lastLogin: user.lastLogin
+        lastLogin: user.lastLogin,
+        firstLoginTime: user.firstLoginTime
       }
     });
   } catch (error) {
@@ -158,6 +162,7 @@ const getCurrentUser = async (req, res) => {
         role: user.role,
         isActive: user.isActive,
         lastLogin: user.lastLogin,
+        firstLoginTime: user.firstLoginTime,
         createdAt: user.createdAt
       }
     });
