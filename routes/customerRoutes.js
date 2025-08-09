@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const customerController = require('../controllers/customerController');
 const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
 
 const router = express.Router();
 
@@ -28,9 +29,8 @@ router.get('/:id', customerController.getCustomerById);
 // @access  Private
 router.post('/', [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters long'),
-  body('email').isEmail().normalizeEmail().withMessage('Please enter a valid email'),
+
   body('phone').optional().trim(),
-  body('company').optional().trim(),
   body('status').optional().isIn(['active', 'inactive', 'pending']).withMessage('Invalid status'),
   body('notes').optional().trim()
 ], customerController.createCustomer);
@@ -40,17 +40,16 @@ router.post('/', [
 // @access  Private
 router.put('/:id', [
   body('name').optional().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters long'),
-  body('email').optional().isEmail().normalizeEmail().withMessage('Please enter a valid email'),
+
   body('phone').optional().trim(),
-  body('company').optional().trim(),
   body('status').optional().isIn(['active', 'inactive', 'pending']).withMessage('Invalid status'),
   body('notes').optional().trim()
 ], customerController.updateCustomer);
 
 // @route   DELETE /api/customers/:id
 // @desc    Delete customer
-// @access  Private
-router.delete('/:id', customerController.deleteCustomer);
+// @access  Admin only
+router.delete('/:id', auth, admin, customerController.deleteCustomer);
 
 // @route   POST /api/customers/convert-lead/:leadId
 // @desc    Convert lead to customer

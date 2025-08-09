@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const { body } = require('express-validator');
 const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
 const {
   uploadLeads,
   getLeads,
@@ -40,20 +41,13 @@ const leadValidation = [
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters'),
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email'),
+
   body('phone')
     .optional()
     .trim()
     .isLength({ max: 20 })
     .withMessage('Phone number is too long'),
-  body('company')
-    .optional()
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage('Company name is too long'),
+
   // **MODIFIED**: Synchronized status enum with the Lead schema
   body('status')
     .optional()
@@ -72,8 +66,8 @@ const leadValidation = [
 ];
 
 // Routes
-// Upload leads from file
-router.post('/upload', auth, upload.single('file'), uploadLeads);
+// Upload leads from file - Admin only
+router.post('/upload', auth, admin, upload.single('file'), uploadLeads);
 
 // Get all leads with pagination and filtering
 router.get('/', auth, getLeads);
@@ -90,13 +84,13 @@ router.put('/:id', auth, leadValidation, updateLead);
 // Update lead status
 router.patch('/:id/status', auth, updateLeadStatus);
 
-// Delete lead (hard delete - completely remove from database)
-router.delete('/:id', auth, deleteLead);
+// Delete lead (hard delete - completely remove from database) - Admin only
+router.delete('/:id', auth, admin, deleteLead);
 
 // Soft delete lead (mark as inactive)
 router.patch('/:id/deactivate', auth, softDeleteLead);
 
-// Export leads to Excel
-router.get('/export/excel', auth, exportLeads);
+// Export leads to Excel - Admin only
+router.get('/export/excel', auth, admin, exportLeads);
 
 module.exports = router;

@@ -67,10 +67,10 @@ const createCallSchedule = async (req, res) => {
     // Populate lead details for response
     await callSchedule.populate({
       path: 'leadId',
-      select: 'name email phone company status',
+      select: 'name  phone  status',
       populate: {
         path: 'createdBy',
-        select: 'name email'
+        select: 'name '
       }
     });
 
@@ -124,20 +124,20 @@ const getCallSchedules = async (req, res) => {
     const callSchedules = await CallSchedule.find(query)
       .populate({
         path: 'leadId',
-        select: 'name email phone company status createdBy',
+        select: 'name  phone  status createdBy',
         populate: {
           path: 'createdBy',
-          select: 'name email'
+          select: 'name '
         }
       })
-      .populate('scheduledBy', 'name email')
+      .populate('scheduledBy', 'name ')
       .sort({ scheduledDate: 1, scheduledTime: 1 });
 
     // Ensure all leads have valid createdBy data
     for (const schedule of callSchedules) {
       if (schedule.leadId && (!schedule.leadId.createdBy || !schedule.leadId.createdBy.name)) {
         // If createdBy is missing or invalid, try to find the user who scheduled the call
-        const scheduledByUser = await User.findById(schedule.scheduledBy).select('name email');
+        const scheduledByUser = await User.findById(schedule.scheduledBy).select('name ');
         if (scheduledByUser) {
           schedule.leadId.createdBy = scheduledByUser;
         }
@@ -185,13 +185,13 @@ const getUpcomingCalls = async (req, res) => {
     const upcomingCalls = await CallSchedule.find(query)
       .populate({
         path: 'leadId',
-        select: 'name email phone company status',
+        select: 'name  phone  status',
         populate: {
           path: 'createdBy',
-          select: 'name email'
+          select: 'name '
         }
       })
-      .populate('scheduledBy', 'name email')
+      .populate('scheduledBy', 'name ')
       .where('scheduledDate').gte(new Date())
       .where('status').equals('Scheduled')
       .limit(parseInt(limit))
@@ -224,10 +224,10 @@ const getCallSchedule = async (req, res) => {
 
     const callSchedule = await CallSchedule.findOne(query).populate({
       path: 'leadId',
-      select: 'name email phone company status',
+      select: 'name  phone  status',
       populate: {
         path: 'createdBy',
-        select: 'name email'
+        select: 'name '
       }
     });
 
@@ -275,10 +275,10 @@ const updateCallSchedule = async (req, res) => {
     await callSchedule.save();
     await callSchedule.populate({
       path: 'leadId',
-      select: 'name email phone company status',
+      select: 'name  phone  status',
       populate: {
         path: 'createdBy',
-        select: 'name email'
+        select: 'name '
       }
     });
 

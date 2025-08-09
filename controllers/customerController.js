@@ -16,7 +16,7 @@ const getCustomers = async (req, res) => {
     }
 
     const customers = await Customer.find(query)
-      .populate('userId', 'name email')
+      .populate('userId', 'name')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -64,21 +64,15 @@ const createCustomer = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, phone, company, status, notes } = req.body;
+    const { name, phone, status, notes } = req.body;
 
-    // Check if customer already exists with this email
-    const existingCustomer = await Customer.findByEmail(email);
-    if (existingCustomer) {
-      return res.status(400).json({ message: 'Customer already exists with this email' });
-    }
+
 
     const customer = new Customer({
-      name,
-      email,
-      phone,
-      company,
-      status,
-      notes,
+          name,
+    phone,
+    status,
+    notes,
       userId: req.user._id
     });
 
@@ -107,7 +101,7 @@ const updateCustomer = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, phone, company, status, notes } = req.body;
+    const { name, phone, status, notes } = req.body;
 
     const customer = await Customer.findOne({
       _id: req.params.id,
@@ -118,23 +112,13 @@ const updateCustomer = async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    // Check if email is already taken by another customer
-    if (email && email !== customer.email) {
-      const existingCustomer = await Customer.findOne({ 
-        email, 
-        _id: { $ne: req.params.id },
-        userId: req.user._id
-      });
-      if (existingCustomer) {
-        return res.status(400).json({ message: 'Email is already in use by another customer' });
-      }
-    }
+
 
     // Update fields
     if (name) customer.name = name;
-    if (email) customer.email = email;
+
     if (phone !== undefined) customer.phone = phone;
-    if (company !== undefined) customer.company = company;
+
     if (status) customer.status = status;
     if (notes !== undefined) customer.notes = notes;
 
@@ -204,19 +188,14 @@ const convertLeadToCustomer = async (req, res) => {
       return res.status(400).json({ message: 'Lead has already been converted to customer' });
     }
 
-    // Check if customer already exists with this email
-    const existingCustomerByEmail = await Customer.findByEmail(lead.email);
-    if (existingCustomerByEmail) {
-      return res.status(400).json({ message: 'Customer already exists with this email' });
-    }
+
 
     // Create new customer from lead
     const customer = new Customer({
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      company: lead.company,
-      status: 'active',
+          name: lead.name,
+    
+    phone: lead.phone,
+    status: 'active',
       notes: `Converted from lead: ${lead.notes || 'No notes'}`,
       convertedFrom: {
         leadId: lead._id,

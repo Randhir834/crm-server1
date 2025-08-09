@@ -8,23 +8,13 @@ const leadSchema = new mongoose.Schema({
     minlength: [2, 'Name must be at least 2 characters long'],
     maxlength: [100, 'Name cannot exceed 100 characters']
   },
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    lowercase: true,
-    trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
+
   phone: {
     type: String,
     trim: true,
     default: ''
   },
-  company: {
-    type: String,
-    trim: true,
-    default: ''
-  },
+
   status: {
     type: String,
     enum: ['New', 'Qualified', 'Negotiation', 'Closed', 'Lost'],
@@ -64,9 +54,9 @@ const leadSchema = new mongoose.Schema({
 });
 
 // Create indexes for better performance
-leadSchema.index({ email: 1 });
+
 leadSchema.index({ status: 1 });
-leadSchema.index({ company: 1 });
+
 leadSchema.index({ createdAt: -1 });
 leadSchema.index({ createdBy: 1 });
 leadSchema.index({ assignedTo: 1 });
@@ -83,10 +73,7 @@ leadSchema.statics.findByStatus = function(status) {
   return this.find({ status, isActive: true });
 };
 
-// Static method to find leads by company
-leadSchema.statics.findByCompany = function(company) {
-  return this.find({ company: { $regex: company, $options: 'i' }, isActive: true });
-};
+
 
 // Static method to get leads statistics
 leadSchema.statics.getStats = function() {

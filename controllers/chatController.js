@@ -14,8 +14,8 @@ const getChats = async (req, res) => {
     // If user is admin, get all chats, otherwise get only user's chats
     if (req.user.role === 'admin') {
       chats = await Chat.find({ isActive: true })
-        .populate('userId', 'name email')
-        .populate('participantId', 'name email company')
+        .populate('userId', 'name ')
+        .populate('participantId', 'name')
         .populate('callScheduleId', 'scheduledDate scheduledTime status')
         .sort({ lastMessage: -1 });
     } else {
@@ -42,7 +42,7 @@ const getChatById = async (req, res) => {
       _id: req.params.id,
       userId: req.user._id,
       isActive: true
-    }).populate('participantId', 'name email company')
+    }).populate('participantId', 'name')
       .populate('callScheduleId', 'scheduledDate scheduledTime status');
 
     if (!chat) {
@@ -115,12 +115,12 @@ const createChat = async (req, res) => {
       participantId,
       participantModel,
       participant.name,
-      participant.email,
+
       callScheduleId
     );
 
     // Populate the chat data
-    await chat.populate('participantId', 'name email company');
+    await chat.populate('participantId', 'name');
     if (callScheduleId) {
       await chat.populate('callScheduleId', 'scheduledDate scheduledTime status');
     }
@@ -173,7 +173,7 @@ const sendMessage = async (req, res) => {
     await chat.addMessage(messageData);
 
     // Populate the updated chat
-    await chat.populate('participantId', 'name email company');
+    await chat.populate('participantId', 'name');
     await chat.populate('callScheduleId', 'scheduledDate scheduledTime status');
 
     res.json({
@@ -226,10 +226,10 @@ const getChatByCallSchedule = async (req, res) => {
     // First, let's check if the call schedule exists at all
     const allCallSchedules = await CallSchedule.find({}).populate({
       path: 'leadId',
-      select: 'name email company',
+      select: 'name',
       populate: {
         path: 'createdBy',
-        select: 'name email'
+        select: 'name '
       }
     });
     console.log('📋 All call schedules:', allCallSchedules.map(cs => ({ id: cs._id, scheduledBy: cs.scheduledBy, leadName: cs.leadId?.name })));
@@ -240,10 +240,10 @@ const getChatByCallSchedule = async (req, res) => {
       scheduledBy: req.user._id
     }).populate({
       path: 'leadId',
-      select: 'name email company',
+      select: 'name',
       populate: {
         path: 'createdBy',
-        select: 'name email'
+        select: 'name '
       }
     });
 
@@ -255,10 +255,10 @@ const getChatByCallSchedule = async (req, res) => {
         _id: callScheduleId
       }).populate({
         path: 'leadId',
-        select: 'name email company',
+        select: 'name',
         populate: {
           path: 'createdBy',
-          select: 'name email'
+          select: 'name '
         }
       });
       
@@ -294,14 +294,14 @@ const getChatByCallSchedule = async (req, res) => {
       callSchedule.leadId._id,
       'Lead',
       callSchedule.leadId.name,
-      callSchedule.leadId.email,
+
       callScheduleId
     );
 
     console.log('💬 Chat created/found:', chat._id);
 
     // Populate the chat data
-    await chat.populate('participantId', 'name email company');
+    await chat.populate('participantId', 'name');
     await chat.populate('callScheduleId', 'scheduledDate scheduledTime status');
 
     res.json({

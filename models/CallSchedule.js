@@ -66,10 +66,10 @@ callScheduleSchema.statics.findUpcoming = function(userId) {
     status: 'Scheduled'
   }).populate({
     path: 'leadId',
-    select: 'name email phone company status',
+    select: 'name  phone  status',
     populate: {
       path: 'createdBy',
-      select: 'name email'
+      select: 'name '
     }
   });
 };
@@ -81,10 +81,10 @@ callScheduleSchema.statics.findByDateRange = function(userId, startDate, endDate
     scheduledDate: { $gte: startDate, $lte: endDate }
   }).populate({
     path: 'leadId',
-    select: 'name email phone company status',
+    select: 'name  phone  status',
     populate: {
       path: 'createdBy',
-      select: 'name email'
+      select: 'name '
     }
   });
 };

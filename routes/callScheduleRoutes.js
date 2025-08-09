@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
 const {
   createCallSchedule,
   getCallSchedules,
@@ -29,6 +30,6 @@ router.get('/upcoming', auth, getUpcomingCalls);
 router.get('/stats', auth, getCallStats);
 router.get('/:id', auth, getCallSchedule);
 router.put('/:id', auth, callScheduleValidation, updateCallSchedule);
-router.delete('/:id', auth, deleteCallSchedule);
+router.delete('/:id', auth, admin, deleteCallSchedule);
 
 module.exports = router; 

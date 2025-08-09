@@ -8,24 +8,13 @@ const customerSchema = new mongoose.Schema({
     minlength: [2, 'Name must be at least 2 characters long'],
     maxlength: [50, 'Name cannot exceed 50 characters']
   },
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
+
   phone: {
     type: String,
     trim: true,
     default: null
   },
-  company: {
-    type: String,
-    trim: true,
-    default: null
-  },
+
   status: {
     type: String,
     enum: ['active', 'inactive', 'pending'],
@@ -62,10 +51,7 @@ customerSchema.index({ userId: 1, createdAt: -1 });
 customerSchema.index({ status: 1 });
 customerSchema.index({ convertedFrom: 1 });
 
-// Static method to find customer by email
-customerSchema.statics.findByEmail = function(email) {
-  return this.findOne({ email });
-};
+
 
 // Static method to find customer by lead ID
 customerSchema.statics.findByLeadId = function(leadId) {

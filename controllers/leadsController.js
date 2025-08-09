@@ -73,16 +73,12 @@ const uploadLeads = async (req, res) => {
       'first name': 'name',
       'last name': 'name',
       'contact name': 'name',
-      'email': 'email',
-      'email address': 'email',
-      'e-mail': 'email',
+      
       'phone': 'phone',
       'phone number': 'phone',
       'mobile': 'phone',
       'telephone': 'phone',
-      'company': 'company',
-      'company name': 'company',
-      'organization': 'company',
+      
       'status': 'status',
       'lead status': 'status',
       'source': 'source',
@@ -110,10 +106,10 @@ const uploadLeads = async (req, res) => {
     });
 
     // Validate required columns (allow index 0)
-    if (typeof columnIndexes.name !== 'number' || typeof columnIndexes.email !== 'number') {
+    if (typeof columnIndexes.name !== 'number') {
       return res.status(400).json({
         success: false,
-        message: 'File must contain "Name" and "Email" columns'
+        message: 'File must contain "Name" column'
       });
     }
 
@@ -125,9 +121,9 @@ const uploadLeads = async (req, res) => {
 
       const leadData = {
         name: row[columnIndexes.name] ? row[columnIndexes.name].toString().trim() : '',
-        email: row[columnIndexes.email] ? row[columnIndexes.email].toString().trim() : '',
+
         phone: columnIndexes.phone ? (row[columnIndexes.phone] ? row[columnIndexes.phone].toString().trim() : '') : '',
-        company: columnIndexes.company ? (row[columnIndexes.company] ? row[columnIndexes.company].toString().trim() : '') : '',
+
         status: columnIndexes.status ? (row[columnIndexes.status] ? row[columnIndexes.status].toString().trim() : 'New') : 'New',
         source: columnIndexes.source ? (row[columnIndexes.source] ? row[columnIndexes.source].toString().trim() : 'Import') : 'Import',
         notes: columnIndexes.notes ? (row[columnIndexes.notes] ? row[columnIndexes.notes].toString().trim() : '') : '',
@@ -141,10 +137,7 @@ const uploadLeads = async (req, res) => {
         return;
       }
 
-      if (!leadData.email || !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(leadData.email)) {
-        errors.push(`Row ${index + 2}: Valid email is required`);
-        return;
-      }
+
 
       // Validate status
       const validStatuses = ['New', 'Qualified', 'Negotiation', 'Closed', 'Lost'];
@@ -170,20 +163,7 @@ const uploadLeads = async (req, res) => {
       });
     }
 
-    // Check for duplicate emails
-    const emails = leads.map(lead => lead.email);
-    const existingLeads = await Lead.find({ email: { $in: emails } });
-    
-    if (existingLeads.length > 0) {
-      const existingEmails = existingLeads.map(lead => lead.email);
-      const duplicates = leads.filter(lead => existingEmails.includes(lead.email));
-      
-      return res.status(400).json({
-        success: false,
-        message: 'Duplicate emails found',
-        duplicates: duplicates.map(lead => lead.email)
-      });
-    }
+
 
     // Insert leads
     const insertedLeads = await Lead.insertMany(leads);
@@ -193,8 +173,8 @@ const uploadLeads = async (req, res) => {
     // Fetch the inserted leads with populated user data
     try {
       const populatedLeads = await Lead.find({ _id: { $in: insertedLeads.map(lead => lead._id) } })
-        .populate('createdBy', 'name email')
-        .populate('assignedTo', 'name email')
+            .populate('createdBy', 'name')
+    .populate('assignedTo', 'name')
         .sort({ createdAt: -1 });
 
       console.log(`✅ Fetched ${populatedLeads.length} leads with populated user data`);
@@ -252,15 +232,15 @@ const getLeads = async (req, res) => {
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { company: { $regex: search, $options: 'i' } }
+
+
       ];
     }
 
     // If limit is very high (like 1000), don't use pagination to show all data
     let leadsQuery = Lead.find(query)
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email')
+          .populate('createdBy', 'name')
+    .populate('assignedTo', 'name')
       .sort({ createdAt: -1 });
 
     if (limit < 1000) {
@@ -272,7 +252,7 @@ const getLeads = async (req, res) => {
     const total = await Lead.countDocuments(query);
 
     console.log(`Leads fetched: ${leads.length} leads, total: ${total}, filter: ${status || 'all'}`);
-    console.log('Sample leads:', leads.slice(0, 3).map(lead => ({ id: lead._id, name: lead.name, status: lead.status, email: lead.email })));
+    console.log('Sample leads:', leads.slice(0, 3).map(lead => ({ id: lead._id, name: lead.name, status: lead.status })));
 
     // Add cache control headers to prevent unnecessary API calls
     res.set({
@@ -374,8 +354,8 @@ const getLeadStats = async (req, res) => {
 const getLead = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id)
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email');
+          .populate('createdBy', 'name')
+    .populate('assignedTo', 'name');
 
     if (!lead) {
       return res.status(404).json({
@@ -415,8 +395,8 @@ const updateLead = async (req, res) => {
       req.params.id,
       req.body,
       { new: true, runValidators: true }
-    ).populate('createdBy', 'name email')
-     .populate('assignedTo', 'name email');
+    )    .populate('createdBy', 'name')
+    .populate('assignedTo', 'name');
 
     if (!lead) {
       return res.status(404).json({
@@ -468,8 +448,8 @@ const updateLeadStatus = async (req, res) => {
         // Add optimistic locking to prevent concurrent updates
         timestamps: true
       }
-    ).populate('createdBy', 'name email')
-     .populate('assignedTo', 'name email');
+    )    .populate('createdBy', 'name')
+    .populate('assignedTo', 'name');
 
     if (!lead) {
       return res.status(404).json({
@@ -481,10 +461,9 @@ const updateLeadStatus = async (req, res) => {
     // If status is 'Qualified', automatically convert to customer
     if (status === 'Qualified') {
       try {
-        // Check if customer already exists with this email
-        const existingCustomer = await Customer.findByEmail(lead.email);
+        
         if (existingCustomer) {
-          console.log(`⚠️ Customer already exists with email: ${lead.email}`);
+
         } else {
           // Check if lead is already converted
           const existingCustomerByLead = await Customer.findByLeadId(lead._id);
@@ -492,9 +471,9 @@ const updateLeadStatus = async (req, res) => {
             // Create new customer from lead
             const customer = new Customer({
               name: lead.name,
-              email: lead.email,
+
               phone: lead.phone,
-              company: lead.company,
+        
               status: 'active',
               notes: `Converted from qualified lead: ${lead.notes || 'No notes'}`,
               convertedFrom: {
@@ -575,9 +554,9 @@ const exportLeads = async (req, res) => {
     const workbook = xlsx.utils.book_new();
     const worksheetData = leads.map(lead => ({
       Name: lead.name,
-      Email: lead.email,
+      
       Phone: lead.phone,
-      Company: lead.company,
+
       Status: lead.status,
       Source: lead.source,
       Notes: lead.notes,

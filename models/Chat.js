@@ -60,10 +60,7 @@ const chatSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  participantEmail: {
-    type: String,
-    required: true
-  },
+
   callScheduleId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CallSchedule',
@@ -124,7 +121,7 @@ chatSchema.methods.markAsRead = function() {
 };
 
 // Static method to find or create chat
-chatSchema.statics.findOrCreateChat = async function(userId, participantId, participantModel, participantName, participantEmail, callScheduleId = null) {
+chatSchema.statics.findOrCreateChat = async function(userId, participantId, participantModel, participantName, callScheduleId = null) {
   let chat = await this.findOne({
     userId,
     participantId,
@@ -138,7 +135,7 @@ chatSchema.statics.findOrCreateChat = async function(userId, participantId, part
       participantId,
       participantModel,
       participantName,
-      participantEmail,
+
       callScheduleId
     });
     await chat.save();
@@ -151,7 +148,7 @@ chatSchema.statics.findOrCreateChat = async function(userId, participantId, part
 chatSchema.statics.getUserChats = function(userId) {
   return this.find({ userId, isActive: true })
     .sort({ lastMessage: -1 })
-    .populate('participantId', 'name email company')
+    .populate('participantId', 'name')
     .populate('callScheduleId', 'scheduledDate scheduledTime status');
 };
 

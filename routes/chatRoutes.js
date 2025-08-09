@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const chatController = require('../controllers/chatController');
 const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
 
 const router = express.Router();
 
@@ -50,7 +51,7 @@ router.get('/call-schedule/:callScheduleId', chatController.getChatByCallSchedul
 
 // @route   DELETE /api/chats/:id
 // @desc    Delete a chat (soft delete)
-// @access  Private
-router.delete('/:id', chatController.deleteChat);
+// @access  Admin only
+router.delete('/:id', auth, admin, chatController.deleteChat);
 
 module.exports = router; 
