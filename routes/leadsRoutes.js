@@ -48,7 +48,7 @@ const upload = multer({
 // Validation rules
 const leadValidation = [
   body("name")
-    .exists({ checkFalsy: true })
+    .notEmpty()
     .withMessage("Name is required")
     .isString()
     .withMessage("Name must be a string")
@@ -57,15 +57,16 @@ const leadValidation = [
     .withMessage("Name must be between 2 and 100 characters"),
 
   body("phone")
-    .optional({ nullable: true })
+    .notEmpty()
+    .withMessage("Phone is required")
     .isString()
     .withMessage("Phone must be a string")
     .trim()
     .isLength({ max: 20 })
     .withMessage("Phone number is too long"),
 
-  body("service")
-    .optional({ nullable: true })
+  body("service") // ✅ Combined validation
+    .optional({ nullable: true, checkFalsy: true })
     .isString()
     .withMessage("Service must be a string")
     .trim()
@@ -73,12 +74,12 @@ const leadValidation = [
     .withMessage("Service description is too long"),
 
   body("status")
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isIn(["New", "Qualified", "Negotiation", "Closed", "Lost"])
     .withMessage("Invalid status"),
 
   body("notes")
-    .optional({ nullable: true })
+    .optional({ nullable: true, checkFalsy: true })
     .isString()
     .withMessage("Notes must be a string")
     .trim()
