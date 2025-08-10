@@ -19,17 +19,11 @@ app.get('/', (req, res) => {
 // Import routes here
 const authRoutes = require('./routes/authRoutes');
 const leadsRoutes = require('./routes/leadsRoutes');
-const callScheduleRoutes = require('./routes/callScheduleRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
-const customerRoutes = require('./routes/customerRoutes');
-const chatRoutes = require('./routes/chatRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadsRoutes);
-app.use('/api/call-schedules', callScheduleRoutes);
 app.use('/api/sessions', sessionRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/chats', chatRoutes);
 
 // MongoDB Atlas connection with proper options
 const connectDB = async () => {

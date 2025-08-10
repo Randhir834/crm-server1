@@ -1,5 +1,4 @@
 const Lead = require('../models/Lead');
-const Customer = require('../models/Customer');
 const xlsx = require('xlsx');
 const { validationResult } = require('express-validator');
 
@@ -79,15 +78,19 @@ const uploadLeads = async (req, res) => {
       'mobile': 'phone',
       'telephone': 'phone',
       
+      'service': 'service',
+      'services': 'service',
+      'service type': 'service',
+      'service category': 'service',
+      
       'status': 'status',
       'lead status': 'status',
-      'source': 'source',
-      'lead source': 'source',
-      'origin': 'source',
+
       'notes': 'notes',
       'note': 'notes',
       'comments': 'notes',
-      'description': 'notes'
+      'description': 'notes',
+
     };
 
     const columnIndexes = {};
@@ -124,9 +127,12 @@ const uploadLeads = async (req, res) => {
 
         phone: columnIndexes.phone ? (row[columnIndexes.phone] ? row[columnIndexes.phone].toString().trim() : '') : '',
 
+        service: columnIndexes.service ? (row[columnIndexes.service] ? row[columnIndexes.service].toString().trim() : '') : '',
+
         status: columnIndexes.status ? (row[columnIndexes.status] ? row[columnIndexes.status].toString().trim() : 'New') : 'New',
-        source: columnIndexes.source ? (row[columnIndexes.source] ? row[columnIndexes.source].toString().trim() : 'Import') : 'Import',
+
         notes: columnIndexes.notes ? (row[columnIndexes.notes] ? row[columnIndexes.notes].toString().trim() : '') : '',
+
         createdBy: req.user._id,
         assignedTo: req.body.assignedTo || null
       };
@@ -232,8 +238,9 @@ const getLeads = async (req, res) => {
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
-
-
+        { phone: { $regex: search, $options: 'i' } },
+        { service: { $regex: search, $options: 'i' } },
+        { notes: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -458,40 +465,7 @@ const updateLeadStatus = async (req, res) => {
       });
     }
 
-    // If status is 'Qualified', automatically convert to customer
-    if (status === 'Qualified') {
-      try {
-        
-        if (existingCustomer) {
 
-        } else {
-          // Check if lead is already converted
-          const existingCustomerByLead = await Customer.findByLeadId(lead._id);
-          if (!existingCustomerByLead) {
-            // Create new customer from lead
-            const customer = new Customer({
-              name: lead.name,
-
-              phone: lead.phone,
-        
-              status: 'active',
-              notes: `Converted from qualified lead: ${lead.notes || 'No notes'}`,
-              convertedFrom: {
-                leadId: lead._id,
-                convertedAt: new Date()
-              },
-              userId: req.user._id
-            });
-
-            await customer.save();
-            console.log(`✅ Lead automatically converted to customer: ${lead.email}`);
-          }
-        }
-      } catch (conversionError) {
-        console.error('❌ Error converting lead to customer:', conversionError);
-        // Don't fail the lead status update if customer conversion fails
-      }
-    }
 
     // Add cache control headers
     res.set({
@@ -556,9 +530,9 @@ const exportLeads = async (req, res) => {
       Name: lead.name,
       
       Phone: lead.phone,
-
+      Service: lead.service,
       Status: lead.status,
-      Source: lead.source,
+
       Notes: lead.notes,
       'Uploaded By': lead.createdBy ? lead.createdBy.name : 'Unknown',
       'Assigned To': lead.assignedTo ? lead.assignedTo.name : '',

@@ -3,8 +3,6 @@ const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const Session = require('../models/Session');
 const Lead = require('../models/Lead');
-const Customer = require('../models/Customer');
-const Chat = require('../models/Chat');
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -228,13 +226,9 @@ const getSystemStats = async (req, res) => {
   try {
     // Import models if not already imported
     const Lead = require('../models/Lead');
-    const Customer = require('../models/Customer');
-    const Chat = require('../models/Chat');
 
     const totalUsers = await User.countDocuments({});
     const totalLeads = await Lead.countDocuments({ isActive: true });
-    const totalCustomers = await Customer.countDocuments({});
-    const totalChats = await Chat.countDocuments({ isActive: true });
 
     // Get user activity stats (users who logged in within last 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -245,8 +239,6 @@ const getSystemStats = async (req, res) => {
     console.log('📊 System stats calculated:', {
       totalUsers,
       totalLeads,
-      totalCustomers,
-      totalChats,
       activeUsers
     });
 
@@ -255,8 +247,6 @@ const getSystemStats = async (req, res) => {
       stats: {
         totalUsers,
         totalLeads,
-        totalCustomers,
-        totalChats,
         activeUsers
       }
     });
@@ -314,18 +304,6 @@ const deleteUser = async (req, res) => {
       { assignedTo: userId },
       { $set: { assignedTo: null } }
     );
-    
-    // Delete all call schedules created by this user
-    const CallSchedule = require('../models/CallSchedule');
-    const deletedCallSchedules = await CallSchedule.deleteMany({ scheduledBy: userId });
-    
-    // Delete all chats associated with this user
-    const Chat = require('../models/Chat');
-    const deletedChats = await Chat.deleteMany({ userId: userId });
-    
-    // Delete all customers created by this user
-    const Customer = require('../models/Customer');
-    const deletedCustomers = await Customer.deleteMany({ userId: userId });
     
     // Finally, delete the user
     await User.findByIdAndDelete(userId);

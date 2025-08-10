@@ -15,21 +15,24 @@ const leadSchema = new mongoose.Schema({
     default: ''
   },
 
+  service: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+
   status: {
     type: String,
     enum: ['New', 'Qualified', 'Negotiation', 'Closed', 'Lost'],
     default: 'New'
   },
-  source: {
-    type: String,
-    trim: true,
-    default: 'Import'
-  },
+
   notes: {
     type: String,
     trim: true,
     default: ''
   },
+
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

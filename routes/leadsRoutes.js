@@ -8,6 +8,7 @@ const {
   uploadLeads,
   getLeads,
   getLeadStats,
+
   getLead,
   updateLead,
   updateLeadStatus,
@@ -48,21 +49,24 @@ const leadValidation = [
     .isLength({ max: 20 })
     .withMessage('Phone number is too long'),
 
+  body('service')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Service description is too long'),
+
   // **MODIFIED**: Synchronized status enum with the Lead schema
   body('status')
     .optional()
     .isIn(['New', 'Qualified', 'Negotiation', 'Closed', 'Lost'])
     .withMessage('Invalid status'),
-  body('source')
-    .optional()
-    .trim()
-    .isLength({ max: 50 })
-    .withMessage('Source is too long'),
+
   body('notes')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Notes are too long')
+    .withMessage('Notes are too long'),
+
 ];
 
 // Routes
@@ -74,6 +78,8 @@ router.get('/', auth, getLeads);
 
 // Get lead statistics
 router.get('/stats', auth, getLeadStats);
+
+
 
 // Get single lead
 router.get('/:id', auth, getLead);

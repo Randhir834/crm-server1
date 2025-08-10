@@ -1,0 +1,21 @@
+{
+  "watch": [
+    ".",
+    "../client/src"
+  ],
+  "ext": "js,json,env,css,jsx,ts,tsx",
+  "ignore": [
+    "node_modules",
+    "uploads",
+    "*.log",
+    "client/build",
+    "client/dist"
+  ],
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": "1000",
+  "legacyWatch": true,
+  "polling": true,
+  "verbose": true
+} 
