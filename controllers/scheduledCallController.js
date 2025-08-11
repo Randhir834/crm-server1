@@ -27,7 +27,7 @@ const createScheduledCall = async (req, res) => {
     // Create scheduled call
     const scheduledCall = new ScheduledCall({
       leadId,
-      scheduledTime: new Date(scheduledTime),
+      scheduledTime: new Date(scheduledTime + 'Z'), // Add Z to ensure UTC parsing
       notes: notes || '',
       createdBy: userId
     });
@@ -99,7 +99,7 @@ const updateScheduledCall = async (req, res) => {
 
     // Update fields
     if (scheduledTime) {
-      scheduledCall.scheduledTime = new Date(scheduledTime);
+      scheduledCall.scheduledTime = new Date(scheduledTime + 'Z'); // Add Z to ensure UTC parsing
     }
     if (notes !== undefined) {
       scheduledCall.notes = notes;

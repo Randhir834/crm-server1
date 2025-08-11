@@ -867,7 +867,7 @@ const handleCallNotConnected = async (req, res) => {
 
     // Calculate time 2 hours from now
     const scheduledTime = new Date();
-    scheduledTime.setHours(scheduledTime.getHours() + 2);
+    scheduledTime.setUTCHours(scheduledTime.getUTCHours() + 2);
 
     // Create a scheduled call for 2 hours later
     const ScheduledCall = require('../models/ScheduledCall');
