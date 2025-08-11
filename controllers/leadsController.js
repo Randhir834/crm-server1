@@ -848,6 +848,14 @@ const handleCallNotConnected = async (req, res) => {
     const { leadId } = req.params;
     const userId = req.user.id;
 
+    // Validate leadId
+    if (!leadId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lead ID is required'
+      });
+    }
+
     // Find the lead
     const lead = await Lead.findById(leadId);
     if (!lead) {
@@ -895,9 +903,18 @@ const handleCallNotConnected = async (req, res) => {
     });
   } catch (error) {
     console.error('Error handling call not connected:', error);
+    
+    // Provide more specific error messages based on error type
+    let errorMessage = 'Internal server error';
+    if (error.name === 'ValidationError') {
+      errorMessage = 'Invalid data provided for scheduling call';
+    } else if (error.name === 'CastError') {
+      errorMessage = 'Invalid lead ID format';
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: errorMessage,
       error: error.message
     });
   }
