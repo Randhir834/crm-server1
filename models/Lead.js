@@ -15,11 +15,7 @@ const leadSchema = new mongoose.Schema({
     default: ''
   },
 
-  service: {
-    type: String,
-    trim: true,
-    default: ''
-  },
+
 
   status: {
     type: String,
@@ -27,7 +23,20 @@ const leadSchema = new mongoose.Schema({
     default: 'New'
   },
 
+  source: {
+    type: String,
+    trim: true,
+    default: 'Manual',
+    maxlength: [50, 'source cannot exceed 50 characters']
+  },
+
   notes: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+
+  points: {
     type: String,
     trim: true,
     default: ''
@@ -47,9 +56,48 @@ const leadSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  callCompleted: {
+    type: Boolean,
+    default: false
+  },
+  callCompletedAt: {
+    type: Date,
+    default: null
+  },
+  callCompletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  callHistory: [{
+    status: {
+      type: String,
+      enum: ['completed', 'not_connected', 'rescheduled'],
+      required: true
+    },
+    completedAt: {
+      type: Date,
+      required: true
+    },
+    completedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    notes: {
+      type: String,
+      default: ''
+    }
+  }],
   isActive: {
     type: Boolean,
     default: true
+  },
+  
+  // Store all additional/dynamic fields from uploaded files
+  additionalFields: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   }
 }, {
   timestamps: true,
@@ -64,6 +112,9 @@ leadSchema.index({ createdAt: -1 });
 leadSchema.index({ createdBy: 1 });
 leadSchema.index({ assignedTo: 1 });
 leadSchema.index({ isActive: 1 });
+leadSchema.index({ callCompleted: 1 });
+leadSchema.index({ callCompletedAt: -1 });
+leadSchema.index({ callCompletedBy: 1 });
 
 // Method to get lead without sensitive fields
 leadSchema.methods.toJSON = function() {

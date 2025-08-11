@@ -20,10 +20,14 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 const leadsRoutes = require('./routes/leadsRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
+const importantPointsRoutes = require('./routes/importantPointsRoutes');
+const scheduledCallRoutes = require('./routes/scheduledCallRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadsRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/important-points', importantPointsRoutes);
+app.use('/api/scheduled-calls', scheduledCallRoutes);
 
 // MongoDB Atlas connection with proper options
 const connectDB = async () => {
@@ -42,7 +46,8 @@ const connectDB = async () => {
     
     // Start server only after successful database connection
     app.listen(PORT, () => {
-      
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 Connected to MongoDB Atlas`);
     });
     
   } catch (error) {
@@ -58,7 +63,7 @@ mongoose.connection.on('error', (err) => {
 });
 
 mongoose.connection.on('disconnected', () => {
-  
+  console.log('❌ MongoDB disconnected');
 });
 
 // Graceful shutdown

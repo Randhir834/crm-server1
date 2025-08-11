@@ -8,13 +8,16 @@ const {
   uploadLeads,
   getLeads,
   getLeadStats,
-
   getLead,
   updateLead,
   updateLeadStatus,
+  updateLeadPoints,
   deleteLead,
   softDeleteLead,
   exportLeads,
+  completeCall,
+  getCompletedCalls,
+  handleCallNotConnected,
 } = require("../controllers/leadsController");
 
 // Configure multer for file uploads
@@ -65,13 +68,7 @@ const leadValidation = [
     .isLength({ max: 20 })
     .withMessage("Phone number is too long"),
 
-  body("service") // ✅ Combined validation
-    .optional({ nullable: true, checkFalsy: true })
-    .isString()
-    .withMessage("Service must be a string")
-    .trim()
-    .isLength({ max: 100 })
-    .withMessage("Service description is too long"),
+
 
   body("status")
     .optional({ nullable: true, checkFalsy: true })
@@ -97,6 +94,9 @@ router.get("/", auth, getLeads);
 // Get lead statistics
 router.get("/stats", auth, getLeadStats);
 
+// Get completed calls
+router.get("/completed-calls", auth, getCompletedCalls);
+
 // Get single lead
 router.get("/:id", auth, getLead);
 
@@ -105,6 +105,15 @@ router.put("/:id", auth, leadValidation, updateLead);
 
 // Update lead status
 router.patch("/:id/status", auth, updateLeadStatus);
+
+// Update lead points after status update
+router.patch("/:id/points", auth, updateLeadPoints);
+
+// Complete a call for a lead
+router.put("/:leadId/complete-call", auth, completeCall);
+
+// Handle call not connected - automatically schedule for 2 hours later
+router.post("/:leadId/call-not-connected", auth, handleCallNotConnected);
 
 // Delete lead (hard delete - completely remove from database) - Admin only
 router.delete("/:id", auth, admin, deleteLead);

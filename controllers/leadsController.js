@@ -16,6 +16,8 @@ const uploadLeads = async (req, res) => {
       originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
+      assignedTo: req.body.assignedTo,
+      userId: req.user.id,
     });
 
     let workbook;
@@ -62,10 +64,30 @@ const uploadLeads = async (req, res) => {
       });
     }
 
+    // Validate assignedTo if provided
+    if (req.body.assignedTo) {
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(req.body.assignedTo)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid assignedTo user ID",
+        });
+      }
+    }
+
     const headers = jsonData[0].map((header) =>
       header ? header.toString().trim() : ""
     );
     const dataRows = jsonData.slice(1);
+
+    // 🔍 DEBUG: Log the actual headers from uploaded file
+    console.log("📋 UPLOADED FILE HEADERS:", headers);
+    console.log("📋 HEADERS COUNT:", headers.length);
+    headers.forEach((header, index) => {
+      console.log(`  Column ${index}: "${header}" (length: ${header.length})`);
+    });
+    
+
 
     // Map headers to expected fields with flexible matching
     const headerMapping = {
@@ -80,18 +102,22 @@ const uploadLeads = async (req, res) => {
       mobile: "phone",
       telephone: "phone",
 
-      service: "service",
-      services: "service",
-      "service type": "service",
-      "service category": "service",
+
 
       status: "status",
       "lead status": "status",
+
+      source: "source",
+      "lead source": "source",
+      "source type": "source",
 
       notes: "notes",
       note: "notes",
       comments: "notes",
       description: "notes",
+      points: "points",
+      "important points": "points",
+      "key points": "points",
     };
 
     const columnIndexes = {};
@@ -104,10 +130,13 @@ const uploadLeads = async (req, res) => {
       }
     });
 
+
     console.log("📋 Header mapping:", {
       headers: headers,
       columnIndexes: columnIndexes,
     });
+
+
 
     // Validate required columns (allow index 0)
     if (typeof columnIndexes.name !== "number") {
@@ -124,15 +153,45 @@ const uploadLeads = async (req, res) => {
       if (!row || row.length === 0) return;
 
       const lead = {
-        name: row["name"] ? row["name"].toString().trim() : "",
-        phone: row["phone"] ? row["phone"].toString().trim() : "",
-        status: row["status"] ? row["status"].toString().trim() : "New",
-        source: row["source"] ? row["source"].toString().trim() : "",
-        service: row["service"] ? row["service"].toString().trim() : "", // ✅ Ensure service from Excel is captured
-        notes: row["notes"] ? row["notes"].toString().trim() : "",
-        assignedTo: req.user.id,
+        name: columnIndexes.name !== undefined && row[columnIndexes.name] ? row[columnIndexes.name].toString().trim() : "",
+        phone: columnIndexes.phone !== undefined && row[columnIndexes.phone] ? row[columnIndexes.phone].toString().trim() : "",
+        status: columnIndexes.status !== undefined && row[columnIndexes.status] ? row[columnIndexes.status].toString().trim() : "New",
+        source: columnIndexes.source !== undefined && row[columnIndexes.source] ? row[columnIndexes.source].toString().trim() : "Import",
+        notes: columnIndexes.notes !== undefined && row[columnIndexes.notes] ? row[columnIndexes.notes].toString().trim() : "",
+        points: columnIndexes.points !== undefined && row[columnIndexes.points] ? row[columnIndexes.points].toString().trim() : "",
+        assignedTo: req.body.assignedTo || req.user.id,
         createdBy: req.user.id,
+        additionalFields: {}
       };
+
+      // Capture all additional columns that aren't in the standard mapping
+      headers.forEach((header, headerIndex) => {
+        if (!header) return; // Skip empty headers
+        
+        const lowerHeader = header.toString().toLowerCase().trim();
+        const isStandardField = headerMapping[lowerHeader];
+        
+        // If this column is not a standard field, store it in additionalFields
+        if (!isStandardField && row[headerIndex] !== undefined && row[headerIndex] !== null) {
+          const value = row[headerIndex].toString().trim();
+          if (value) { // Only store non-empty values
+            lead.additionalFields[header] = value;
+          }
+        }
+      });
+
+      // Log the processed lead data for debugging
+      console.log(`📝 Processed lead ${index + 2}:`, {
+        name: lead.name,
+        phone: lead.phone,
+        status: lead.status,
+        source: lead.source,
+        notes: lead.notes,
+        points: lead.points,
+        additionalFields: lead.additionalFields,
+        columnIndexes: columnIndexes,
+        rowData: row
+      });
 
       // Validate lead data
       if (!lead.name || lead.name.length < 2) {
@@ -176,6 +235,22 @@ const uploadLeads = async (req, res) => {
     const insertedLeads = await Lead.insertMany(leads);
 
     console.log(`✅ Successfully inserted ${insertedLeads.length} leads`);
+    
+    // Log the first few inserted leads to verify data
+    if (insertedLeads.length > 0) {
+      console.log("📊 Sample of inserted leads:");
+      insertedLeads.slice(0, 3).forEach((lead, index) => {
+        console.log(`  Lead ${index + 1}:`, {
+          name: lead.name,
+          phone: lead.phone,
+          status: lead.status,
+          source: lead.source,
+          notes: lead.notes,
+          points: lead.points,
+          additionalFields: lead.additionalFields
+        });
+      });
+    }
 
     // Fetch the inserted leads with populated user data
     try {
@@ -225,7 +300,7 @@ const getLeads = async (req, res) => {
     const search = req.query.search;
 
     // Build query based on user role
-    let query = { isActive: true };
+    let query = { isActive: true, callCompleted: { $ne: true } };
 
     // If user is not admin, only show leads assigned to them or created by them
     if (req.user.role !== "admin") {
@@ -240,7 +315,7 @@ const getLeads = async (req, res) => {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { phone: { $regex: search, $options: "i" } },
-        { service: { $regex: search, $options: "i" } },
+
         { notes: { $regex: search, $options: "i" } },
       ];
     }
@@ -262,7 +337,7 @@ const getLeads = async (req, res) => {
     console.log(
       `Leads fetched: ${leads.length} leads, total: ${total}, filter: ${
         status || "all"
-      }`
+      }${limit >= 1000 ? ' (ALL LEADS - No pagination)' : ''}`
     );
     console.log(
       "Sample leads:",
@@ -302,7 +377,7 @@ const getLeads = async (req, res) => {
 const getLeadStats = async (req, res) => {
   try {
     // Build match condition based on user role
-    let matchCondition = { isActive: true };
+    let matchCondition = { isActive: true, callCompleted: { $ne: true } };
 
     // If user is not admin, only show stats for leads assigned to them or created by them
     if (req.user.role !== "admin") {
@@ -500,6 +575,65 @@ const updateLeadStatus = async (req, res) => {
   }
 };
 
+// Update lead points
+const updateLeadPoints = async (req, res) => {
+  try {
+    const { points } = req.body;
+
+    // Validate points
+    if (points && typeof points !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: "Points must be a string",
+      });
+    }
+
+    // Use findOneAndUpdate with optimistic locking to prevent race conditions
+    const lead = await Lead.findOneAndUpdate(
+      { _id: req.params.id, isActive: true },
+      {
+        points: points || '',
+        updatedAt: new Date(), // Ensure timestamp is updated
+      },
+      {
+        new: true,
+        runValidators: true,
+        // Add optimistic locking to prevent concurrent updates
+        timestamps: true,
+      }
+    )
+      .populate("createdBy", "name")
+      .populate("assignedTo", "name");
+
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found",
+      });
+    }
+
+    // Add cache control headers
+    res.set({
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    });
+
+    res.json({
+      success: true,
+      message: "Lead points updated successfully",
+      lead,
+    });
+  } catch (error) {
+    console.error("Update lead points error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating lead points",
+      error: error.message,
+    });
+  }
+};
+
 // Delete lead (hard delete - completely remove from database)
 const deleteLead = async (req, res) => {
   try {
@@ -535,19 +669,28 @@ const exportLeads = async (req, res) => {
       .sort({ createdAt: -1 });
 
     const workbook = xlsx.utils.book_new();
-    const worksheetData = leads.map((lead) => ({
-      Name: lead.name,
+    const worksheetData = leads.map((lead) => {
+      const baseData = {
+        Name: lead.name,
+        Phone: lead.phone,
+        Status: lead.status,
+        Notes: lead.notes,
+        "Important Points": lead.points || "",
+        "Uploaded By": lead.createdBy ? lead.createdBy.name : "Unknown",
+        "Assigned To": lead.assignedTo ? lead.assignedTo.name : "",
+        "Created Date": lead.createdAt.toISOString().split("T")[0],
+        "Last Updated": lead.updatedAt.toISOString().split("T")[0],
+      };
 
-      Phone: lead.phone,
-      Service: lead.service,
-      Status: lead.status,
+      // Add all additional fields to the export
+      if (lead.additionalFields && typeof lead.additionalFields === 'object') {
+        Object.keys(lead.additionalFields).forEach(key => {
+          baseData[key] = lead.additionalFields[key];
+        });
+      }
 
-      Notes: lead.notes,
-      "Uploaded By": lead.createdBy ? lead.createdBy.name : "Unknown",
-      "Assigned To": lead.assignedTo ? lead.assignedTo.name : "",
-      "Created Date": lead.createdAt.toISOString().split("T")[0],
-      "Last Updated": lead.updatedAt.toISOString().split("T")[0],
-    }));
+      return baseData;
+    });
 
     const worksheet = xlsx.utils.json_to_sheet(worksheetData);
     xlsx.utils.book_append_sheet(workbook, worksheet, "Leads");
@@ -605,6 +748,161 @@ const softDeleteLead = async (req, res) => {
   }
 };
 
+// Complete a call for a lead
+const completeCall = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { callStatus, completedAt } = req.body;
+    const userId = req.user.id;
+
+    // Find the lead
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
+    }
+
+    // Update lead with call completion info
+    lead.lastContacted = new Date(completedAt);
+    lead.callCompleted = true;
+    lead.callCompletedAt = new Date(completedAt);
+    lead.callCompletedBy = userId;
+    
+    // Add to call history
+    if (!lead.callHistory) {
+      lead.callHistory = [];
+    }
+    lead.callHistory.push({
+      status: callStatus,
+      completedAt: new Date(completedAt),
+      completedBy: userId
+    });
+
+    await lead.save();
+
+    // Create a completed scheduled call record
+    const ScheduledCall = require('../models/ScheduledCall');
+    const completedCall = new ScheduledCall({
+      leadId: lead._id,
+      scheduledTime: new Date(completedAt),
+      status: 'completed',
+      notes: 'Call completed successfully',
+      createdBy: userId
+    });
+
+    await completedCall.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Call completed successfully',
+      lead
+    });
+  } catch (error) {
+    console.error('Error completing call:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get all completed calls
+const getCompletedCalls = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Build query based on user role
+    let query = { isActive: true, callCompleted: true };
+
+    // If user is not admin, only show leads assigned to them or created by them
+    if (req.user.role !== "admin") {
+      query.$or = [{ createdBy: req.user._id }, { assignedTo: req.user._id }];
+    }
+
+    const completedLeads = await Lead.find(query)
+      .populate("createdBy", "name")
+      .populate("assignedTo", "name")
+      .populate("callCompletedBy", "name")
+      .sort({ callCompletedAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      completedLeads
+    });
+  } catch (error) {
+    console.error('Error fetching completed calls:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Handle call not connected - automatically schedule for 2 hours later
+const handleCallNotConnected = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const userId = req.user.id;
+
+    // Find the lead
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
+    }
+
+    // Calculate time 2 hours from now
+    const scheduledTime = new Date();
+    scheduledTime.setHours(scheduledTime.getHours() + 2);
+
+    // Create a scheduled call for 2 hours later
+    const ScheduledCall = require('../models/ScheduledCall');
+    const scheduledCall = new ScheduledCall({
+      leadId: lead._id,
+      scheduledTime: scheduledTime,
+      status: 'pending',
+      notes: 'Auto-scheduled after call not connected',
+      createdBy: userId
+    });
+
+    await scheduledCall.save();
+
+    // Update lead with last contact attempt
+    lead.lastContacted = new Date();
+    if (!lead.callHistory) {
+      lead.callHistory = [];
+    }
+    lead.callHistory.push({
+      status: 'not_connected',
+      attemptedAt: new Date(),
+      attemptedBy: userId,
+      scheduledFor: scheduledTime
+    });
+
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Call not connected - automatically scheduled for 2 hours later',
+      scheduledCall,
+      scheduledTime: scheduledTime
+    });
+  } catch (error) {
+    console.error('Error handling call not connected:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   uploadLeads,
   getLeads,
@@ -612,7 +910,11 @@ module.exports = {
   getLead,
   updateLead,
   updateLeadStatus,
+  updateLeadPoints,
   deleteLead,
   softDeleteLead,
   exportLeads,
+  completeCall,
+  getCompletedCalls,
+  handleCallNotConnected,
 };
