@@ -15,9 +15,12 @@ const {
   deleteLead,
   softDeleteLead,
   exportLeads,
+  restoreLead,
+  scheduleCall,
+  getScheduledCalls,
   completeCall,
   getCompletedCalls,
-  handleCallNotConnected,
+
 } = require("../controllers/leadsController");
 
 // Configure multer for file uploads
@@ -97,6 +100,9 @@ router.get("/stats", auth, getLeadStats);
 // Get completed calls
 router.get("/completed-calls", auth, getCompletedCalls);
 
+// Get scheduled calls
+router.get("/scheduled-calls", auth, getScheduledCalls);
+
 // Get single lead
 router.get("/:id", auth, getLead);
 
@@ -112,8 +118,13 @@ router.patch("/:id/points", auth, updateLeadPoints);
 // Complete a call for a lead
 router.put("/:leadId/complete-call", auth, completeCall);
 
-// Handle call not connected - automatically schedule for 2 hours later
-router.post("/:leadId/call-not-connected", auth, handleCallNotConnected);
+// Restore a completed lead back to active calls
+router.patch("/:leadId/restore", auth, restoreLead);
+
+// Schedule a call for a lead
+router.patch("/:leadId/schedule", auth, scheduleCall);
+
+
 
 // Delete lead (hard delete - completely remove from database) - Admin only
 router.delete("/:id", auth, admin, deleteLead);

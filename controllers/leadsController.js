@@ -748,6 +748,84 @@ const softDeleteLead = async (req, res) => {
   }
 };
 
+// Restore a completed lead back to active calls
+const restoreLead = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { callCompleted, callCompletedAt, callCompletedBy } = req.body;
+    const userId = req.user.id;
+
+    // Find the lead
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
+    }
+
+    // Update lead to mark as not completed
+    lead.callCompleted = callCompleted;
+    lead.callCompletedAt = callCompletedAt;
+    lead.callCompletedBy = callCompletedBy;
+    
+    // Clear the call history for this lead
+    lead.callHistory = [];
+
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Lead restored successfully',
+      lead
+    });
+  } catch (error) {
+    console.error('Error restoring lead:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Schedule a call for a lead
+const scheduleCall = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { scheduledAt } = req.body;
+    const userId = req.user.id;
+
+    // Find the lead
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
+    }
+
+    // Update lead with scheduled time
+    lead.scheduledAt = new Date(scheduledAt);
+    lead.lastContacted = new Date();
+
+    await lead.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Call scheduled successfully',
+      lead
+    });
+  } catch (error) {
+    console.error('Error scheduling call:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
 // Complete a call for a lead
 const completeCall = async (req, res) => {
   try {
@@ -782,17 +860,7 @@ const completeCall = async (req, res) => {
 
     await lead.save();
 
-    // Create a completed scheduled call record
-    const ScheduledCall = require('../models/ScheduledCall');
-    const completedCall = new ScheduledCall({
-      leadId: lead._id,
-      scheduledTime: new Date(completedAt),
-      status: 'completed',
-      notes: 'Call completed successfully',
-      createdBy: userId
-    });
 
-    await completedCall.save();
 
     res.status(200).json({
       success: true,
@@ -801,6 +869,38 @@ const completeCall = async (req, res) => {
     });
   } catch (error) {
     console.error('Error completing call:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Get all scheduled calls
+const getScheduledCalls = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Build query based on user role
+    let query = { isActive: true, scheduledAt: { $ne: null } };
+
+    // If user is not admin, only show leads assigned to them or created by them
+    if (req.user.role !== "admin") {
+      query.$or = [{ createdBy: req.user._id }, { assignedTo: req.user._id }];
+    }
+
+    const scheduledLeads = await Lead.find(query)
+      .populate("createdBy", "name")
+      .populate("assignedTo", "name")
+      .sort({ scheduledAt: 1 });
+
+    res.status(200).json({
+      success: true,
+      scheduledLeads
+    });
+  } catch (error) {
+    console.error('Error fetching scheduled calls:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -842,83 +942,7 @@ const getCompletedCalls = async (req, res) => {
   }
 };
 
-// Handle call not connected - automatically schedule for 2 hours later
-const handleCallNotConnected = async (req, res) => {
-  try {
-    const { leadId } = req.params;
-    const userId = req.user.id;
 
-    // Validate leadId
-    if (!leadId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Lead ID is required'
-      });
-    }
-
-    // Find the lead
-    const lead = await Lead.findById(leadId);
-    if (!lead) {
-      return res.status(404).json({
-        success: false,
-        message: 'Lead not found'
-      });
-    }
-
-    // Calculate time 2 hours from now
-    const scheduledTime = new Date();
-    scheduledTime.setUTCHours(scheduledTime.getUTCHours() + 2);
-
-    // Create a scheduled call for 2 hours later
-    const ScheduledCall = require('../models/ScheduledCall');
-    const scheduledCall = new ScheduledCall({
-      leadId: lead._id,
-      scheduledTime: scheduledTime,
-      status: 'pending',
-      notes: 'Auto-scheduled after call not connected',
-      createdBy: userId
-    });
-
-    await scheduledCall.save();
-
-    // Update lead with last contact attempt
-    lead.lastContacted = new Date();
-    if (!lead.callHistory) {
-      lead.callHistory = [];
-    }
-    lead.callHistory.push({
-      status: 'not_connected',
-      attemptedAt: new Date(),
-      attemptedBy: userId,
-      scheduledFor: scheduledTime
-    });
-
-    await lead.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Call not connected - automatically scheduled for 2 hours later',
-      scheduledCall,
-      scheduledTime: scheduledTime
-    });
-  } catch (error) {
-    console.error('Error handling call not connected:', error);
-    
-    // Provide more specific error messages based on error type
-    let errorMessage = 'Internal server error';
-    if (error.name === 'ValidationError') {
-      errorMessage = 'Invalid data provided for scheduling call';
-    } else if (error.name === 'CastError') {
-      errorMessage = 'Invalid lead ID format';
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: errorMessage,
-      error: error.message
-    });
-  }
-};
 
 module.exports = {
   uploadLeads,
@@ -931,7 +955,9 @@ module.exports = {
   deleteLead,
   softDeleteLead,
   exportLeads,
+  restoreLead,
+  scheduleCall,
+  getScheduledCalls,
   completeCall,
   getCompletedCalls,
-  handleCallNotConnected,
 };
