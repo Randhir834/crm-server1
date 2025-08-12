@@ -73,6 +73,10 @@ const leadSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  notConnectedAt: {
+    type: Date,
+    default: null
+  },
   callHistory: [{
     status: {
       type: String,
@@ -120,6 +124,7 @@ leadSchema.index({ callCompleted: 1 });
 leadSchema.index({ callCompletedAt: -1 });
 leadSchema.index({ callCompletedBy: 1 });
 leadSchema.index({ scheduledAt: 1 });
+leadSchema.index({ notConnectedAt: 1 });
 
 // Method to get lead without sensitive fields
 leadSchema.methods.toJSON = function() {

@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const admin = require("../middleware/admin");
 const {
   uploadLeads,
+  getAllLeads,
   getLeads,
   getLeadStats,
   getLead,
@@ -16,8 +17,12 @@ const {
   softDeleteLead,
   exportLeads,
   restoreLead,
+  markNotConnected,
   scheduleCall,
   getScheduledCalls,
+  getNotConnectedCalls,
+  debugNotConnected,
+  debugLeadStatus,
   completeCall,
   getCompletedCalls,
 
@@ -91,7 +96,10 @@ const leadValidation = [
 // Upload leads from file - Admin only
 router.post("/upload", auth, admin, upload.single("file"), uploadLeads);
 
-// Get all leads with pagination and filtering
+// Get all leads (for Leads page - shows ALL leads regardless of status)
+router.get("/all", auth, getAllLeads);
+
+// Get active leads (for Call page - shows only non-completed leads)
 router.get("/", auth, getLeads);
 
 // Get lead statistics
@@ -102,6 +110,15 @@ router.get("/completed-calls", auth, getCompletedCalls);
 
 // Get scheduled calls
 router.get("/scheduled-calls", auth, getScheduledCalls);
+
+// Get not connected calls
+router.get("/not-connected-calls", auth, getNotConnectedCalls);
+
+// Debug route to check not connected leads
+router.get("/debug-not-connected", auth, debugNotConnected);
+
+// Debug route to check a specific lead's status
+router.get("/debug-lead/:leadId", auth, debugLeadStatus);
 
 // Get single lead
 router.get("/:id", auth, getLead);
@@ -123,6 +140,9 @@ router.patch("/:leadId/restore", auth, restoreLead);
 
 // Schedule a call for a lead
 router.patch("/:leadId/schedule", auth, scheduleCall);
+
+// Mark a call as not connected
+router.patch("/:leadId/not-connected", auth, markNotConnected);
 
 
 

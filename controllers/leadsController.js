@@ -291,16 +291,16 @@ const uploadLeads = async (req, res) => {
   }
 };
 
-// Get all leads
-const getLeads = async (req, res) => {
+// Get all leads (for Leads page - shows ALL leads regardless of status)
+const getAllLeads = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const status = req.query.status;
     const search = req.query.search;
 
-    // Build query based on user role
-    let query = { isActive: true, callCompleted: { $ne: true } };
+    // Build query - show ALL leads regardless of call status
+    let query = { isActive: true };
 
     // If user is not admin, only show leads assigned to them or created by them
     if (req.user.role !== "admin") {
@@ -315,9 +315,99 @@ const getLeads = async (req, res) => {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { phone: { $regex: search, $options: "i" } },
-
         { notes: { $regex: search, $options: "i" } },
       ];
+    }
+
+    // If limit is very high (like 1000), don't use pagination to show all data
+    let leadsQuery = Lead.find(query)
+      .populate("createdBy", "name")
+      .populate("assignedTo", "name")
+      .sort({ createdAt: -1 });
+
+    if (limit < 1000) {
+      const skip = (page - 1) * limit;
+      leadsQuery = leadsQuery.skip(skip).limit(limit);
+    }
+
+    const leads = await leadsQuery;
+    const total = await Lead.countDocuments(query);
+
+    console.log(
+      `All leads fetched: ${leads.length} leads, total: ${total}, filter: ${
+        status || "all"
+      }${limit >= 1000 ? ' (ALL LEADS - No pagination)' : ''}`
+    );
+    console.log(
+      "Sample leads:",
+      leads
+        .slice(0, 3)
+        .map((lead) => ({ id: lead._id, name: lead.name, status: lead.status, callCompleted: lead.callCompleted, scheduledAt: lead.scheduledAt }))
+    );
+
+    // Add cache control headers to prevent unnecessary API calls
+    res.set({
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    });
+
+    res.json({
+      success: true,
+      leads,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Get all leads error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching leads",
+      error: error.message,
+    });
+  }
+};
+
+// Get active leads (for Call page - shows only non-completed leads)
+const getLeads = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const status = req.query.status;
+    const search = req.query.search;
+
+    // Build query based on user role
+    // Show leads that are NOT completed, NOT scheduled, and NOT marked as not connected
+    // Note: If a lead is marked as not connected, it gets automatically scheduled for follow-up
+    let query = { isActive: true, callCompleted: { $ne: true }, scheduledAt: null, notConnectedAt: null };
+
+    console.log('Initial query filters:', JSON.stringify(query, null, 2));
+
+    // If user is not admin, only show leads assigned to them or created by them
+    if (req.user.role !== "admin") {
+      query.$or = [{ createdBy: req.user._id }, { assignedTo: req.user._id }];
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      // Create a separate search condition that respects the main filters
+      const searchCondition = {
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { phone: { $regex: search, $options: "i" } },
+          { notes: { $regex: search, $options: "i" } },
+        ]
+      };
+      
+      // Combine search with existing filters
+      query = { ...query, ...searchCondition };
     }
 
     // If limit is very high (like 1000), don't use pagination to show all data
@@ -339,6 +429,15 @@ const getLeads = async (req, res) => {
         status || "all"
       }${limit >= 1000 ? ' (ALL LEADS - No pagination)' : ''}`
     );
+    console.log('Query filters:', JSON.stringify(query, null, 2));
+    console.log('Sample leads with status:', leads.slice(0, 3).map(lead => ({
+      id: lead._id,
+      name: lead.name,
+      status: lead.status,
+      callCompleted: lead.callCompleted,
+      scheduledAt: lead.scheduledAt,
+      notConnectedAt: lead.notConnectedAt
+    })));
     console.log(
       "Sample leads:",
       leads
@@ -377,7 +476,7 @@ const getLeads = async (req, res) => {
 const getLeadStats = async (req, res) => {
   try {
     // Build match condition based on user role
-    let matchCondition = { isActive: true, callCompleted: { $ne: true } };
+    let matchCondition = { isActive: true, callCompleted: { $ne: true }, scheduledAt: null, notConnectedAt: null };
 
     // If user is not admin, only show stats for leads assigned to them or created by them
     if (req.user.role !== "admin") {
@@ -663,6 +762,7 @@ const deleteLead = async (req, res) => {
 // Export leads
 const exportLeads = async (req, res) => {
   try {
+    // Export ALL leads regardless of call status
     const leads = await Lead.find({ isActive: true })
       .populate("createdBy", "name")
       .populate("assignedTo", "name")
@@ -752,7 +852,7 @@ const softDeleteLead = async (req, res) => {
 const restoreLead = async (req, res) => {
   try {
     const { leadId } = req.params;
-    const { callCompleted, callCompletedAt, callCompletedBy } = req.body;
+    const { callCompleted, callCompletedAt, callCompletedBy, scheduledAt, notConnectedAt } = req.body;
     const userId = req.user.id;
 
     // Find the lead
@@ -769,10 +869,45 @@ const restoreLead = async (req, res) => {
     lead.callCompletedAt = callCompletedAt;
     lead.callCompletedBy = callCompletedBy;
     
+    // Clear the scheduled time if provided
+    if (scheduledAt === null) {
+      lead.scheduledAt = null;
+    }
+    
+    // Clear the not connected timestamp if provided
+    if (notConnectedAt === null) {
+      lead.notConnectedAt = null;
+      // Also clear scheduled time if it was auto-scheduled from not connected
+      if (lead.scheduledAt) {
+        lead.scheduledAt = null;
+      }
+    }
+    
     // Clear the call history for this lead
     lead.callHistory = [];
 
+    console.log('Restoring lead:', {
+      leadId: lead._id,
+      leadName: lead.name,
+      callCompleted: lead.callCompleted,
+      scheduledAt: lead.scheduledAt,
+      notConnectedAt: lead.notConnectedAt,
+      beforeSave: true
+    });
+
     await lead.save();
+
+    // Verify the lead was saved correctly
+    const savedLead = await Lead.findById(leadId);
+    console.log('Lead restored successfully:', {
+      leadId: lead._id,
+      afterSave: true,
+      savedLead: {
+        callCompleted: savedLead.callCompleted,
+        scheduledAt: savedLead.scheduledAt,
+        notConnectedAt: savedLead.notConnectedAt
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -781,6 +916,62 @@ const restoreLead = async (req, res) => {
     });
   } catch (error) {
     console.error('Error restoring lead:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+// Mark a call as not connected
+const markNotConnected = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const { notConnectedAt } = req.body;
+    const userId = req.user.id;
+
+    // Find the lead
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
+    }
+
+    // Update lead with not connected timestamp
+    lead.notConnectedAt = new Date(notConnectedAt);
+    lead.lastContacted = new Date();
+    
+    // Automatically schedule a follow-up call exactly 2 hours later
+    const followUpTime = new Date(notConnectedAt);
+    followUpTime.setHours(followUpTime.getHours() + 2);
+    lead.scheduledAt = followUpTime;
+
+    console.log('Marking lead as not connected:', {
+      leadId: lead._id,
+      leadName: lead.name,
+      notConnectedAt: lead.notConnectedAt,
+      scheduledAt: lead.scheduledAt,
+      beforeSave: true
+    });
+
+    await lead.save();
+
+    console.log('Lead saved successfully:', {
+      leadId: lead._id,
+      notConnectedAt: lead.notConnectedAt,
+      afterSave: true
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Call marked as not connected successfully',
+      lead
+    });
+  } catch (error) {
+    console.error('Error marking call as not connected:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -877,12 +1068,116 @@ const completeCall = async (req, res) => {
   }
 };
 
+// Debug: Check for not connected leads
+const debugNotConnected = async (req, res) => {
+  try {
+    const notConnectedLeads = await Lead.find({ notConnectedAt: { $ne: null } });
+    console.log('Debug: Found not connected leads:', notConnectedLeads.length);
+    notConnectedLeads.forEach(lead => {
+      console.log('Not connected lead:', {
+        id: lead._id,
+        name: lead.name,
+        notConnectedAt: lead.notConnectedAt
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      count: notConnectedLeads.length,
+      leads: notConnectedLeads
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Debug error',
+      error: error.message
+    });
+  }
+};
+
+// Debug: Check a specific lead's status
+const debugLeadStatus = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+    const lead = await Lead.findById(leadId);
+    
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Lead not found'
+      });
+    }
+
+    console.log('Debug lead status:', {
+      id: lead._id,
+      name: lead.name,
+      callCompleted: lead.callCompleted,
+      scheduledAt: lead.scheduledAt,
+      notConnectedAt: lead.notConnectedAt,
+      isActive: lead.isActive
+    });
+
+    res.status(200).json({
+      success: true,
+      lead: {
+        id: lead._id,
+        name: lead.name,
+        callCompleted: lead.callCompleted,
+        scheduledAt: lead.scheduledAt,
+        notConnectedAt: lead.notConnectedAt,
+        isActive: lead.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Debug lead status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Debug error',
+      error: error.message
+    });
+  }
+};
+
+// Get all not connected calls
+const getNotConnectedCalls = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Build query based on user role
+    let query = { isActive: true, notConnectedAt: { $ne: null } };
+
+    // If user is not admin, only show leads assigned to them or created by them
+    if (req.user.role !== "admin") {
+      query.$or = [{ createdBy: req.user._id }, { assignedTo: req.user._id }];
+    }
+
+    const notConnectedLeads = await Lead.find(query)
+      .populate("createdBy", "name")
+      .populate("assignedTo", "name")
+      .sort({ notConnectedAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      notConnectedLeads
+    });
+  } catch (error) {
+    console.error('Error fetching not connected calls:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
 // Get all scheduled calls
 const getScheduledCalls = async (req, res) => {
   try {
     const userId = req.user.id;
 
     // Build query based on user role
+    // Show leads that are scheduled (including auto-scheduled follow-ups from not connected)
     let query = { isActive: true, scheduledAt: { $ne: null } };
 
     // If user is not admin, only show leads assigned to them or created by them
@@ -894,6 +1189,9 @@ const getScheduledCalls = async (req, res) => {
       .populate("createdBy", "name")
       .populate("assignedTo", "name")
       .sort({ scheduledAt: 1 });
+
+    console.log('Scheduled calls query:', JSON.stringify(query, null, 2));
+    console.log('Found scheduled leads:', scheduledLeads.length);
 
     res.status(200).json({
       success: true,
@@ -946,6 +1244,7 @@ const getCompletedCalls = async (req, res) => {
 
 module.exports = {
   uploadLeads,
+  getAllLeads,
   getLeads,
   getLeadStats,
   getLead,
@@ -956,8 +1255,12 @@ module.exports = {
   softDeleteLead,
   exportLeads,
   restoreLead,
+  markNotConnected,
   scheduleCall,
   getScheduledCalls,
+  getNotConnectedCalls,
+  debugNotConnected,
+  debugLeadStatus,
   completeCall,
   getCompletedCalls,
 };
