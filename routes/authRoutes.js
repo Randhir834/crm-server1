@@ -214,6 +214,17 @@ router.get('/check-first-user', checkFirstUser);
 // Get all users (admin only)
 router.get('/users', auth, admin, getAllUsers);
 
+// Get users for filtering (authenticated users)
+router.get('/users/list', auth, async (req, res) => {
+  try {
+    const users = await User.find({}, 'name _id').sort({ name: 1 });
+    res.json({ users });
+  } catch (error) {
+    console.error('Get users list error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Update user role (admin only)
 router.put('/users/:id/role', auth, admin, [
   body('role').isIn(['user', 'admin']).withMessage('Role must be either "user" or "admin"')

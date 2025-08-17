@@ -372,7 +372,7 @@ const getAllLeads = async (req, res) => {
   }
 };
 
-// Get active leads (for Call page - shows only non-completed leads)
+// Get leads (for Call page - shows both active and completed calls)
 const getLeads = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -381,9 +381,23 @@ const getLeads = async (req, res) => {
     const search = req.query.search;
 
     // Build query based on user role
-    // Show leads that are NOT completed, NOT scheduled, and NOT marked as not connected
+    // Show leads that are active (including completed calls)
+    // Only exclude leads that are currently scheduled or marked as not connected
     // Note: If a lead is marked as not connected, it gets automatically scheduled for follow-up
-    let query = { isActive: true, callCompleted: { $ne: true }, scheduledAt: null, notConnectedAt: null };
+    let query = { isActive: true };
+    
+    // Exclude leads that are currently scheduled or marked as not connected
+    // But include completed calls even if they were previously scheduled/not connected
+    query.$and = [
+      { $or: [
+        { scheduledAt: null },
+        { callCompleted: true }  // Include completed calls even if they were scheduled
+      ]},
+      { $or: [
+        { notConnectedAt: null },
+        { callCompleted: true }  // Include completed calls even if they were marked as not connected
+      ]}
+    ];
 
     console.log('Initial query filters:', JSON.stringify(query, null, 2));
 
@@ -425,7 +439,7 @@ const getLeads = async (req, res) => {
     const total = await Lead.countDocuments(query);
 
     console.log(
-      `Leads fetched: ${leads.length} leads, total: ${total}, filter: ${
+      `Leads fetched: ${leads.length} leads (including completed calls), total: ${total}, filter: ${
         status || "all"
       }${limit >= 1000 ? ' (ALL LEADS - No pagination)' : ''}`
     );
@@ -435,6 +449,7 @@ const getLeads = async (req, res) => {
       name: lead.name,
       status: lead.status,
       callCompleted: lead.callCompleted,
+      callCompletedAt: lead.callCompletedAt,
       scheduledAt: lead.scheduledAt,
       notConnectedAt: lead.notConnectedAt
     })));
@@ -472,11 +487,26 @@ const getLeads = async (req, res) => {
   }
 };
 
-// Get lead statistics
+// Get lead statistics (including completed calls)
 const getLeadStats = async (req, res) => {
   try {
     // Build match condition based on user role
-    let matchCondition = { isActive: true, callCompleted: { $ne: true }, scheduledAt: null, notConnectedAt: null };
+    // Include both active and completed calls in statistics
+    // Only exclude leads that are currently scheduled or marked as not connected
+    let matchCondition = { isActive: true };
+    
+    // Exclude leads that are currently scheduled or marked as not connected
+    // But include completed calls even if they were previously scheduled/not connected
+    matchCondition.$and = [
+      { $or: [
+        { scheduledAt: null },
+        { callCompleted: true }  // Include completed calls even if they were scheduled
+      ]},
+      { $or: [
+        { notConnectedAt: null },
+        { callCompleted: true }  // Include completed calls even if they were marked as not connected
+      ]}
+    ];
 
     // If user is not admin, only show stats for leads assigned to them or created by them
     if (req.user.role !== "admin") {
